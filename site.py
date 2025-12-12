@@ -1,6 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-from flask import Flask, request, jsonify
 import json
 import os
 
@@ -89,48 +88,16 @@ async def show_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = f"*{item['name']}*\n{item['description']}\n{item['price']}"
             await query.message.reply_text(text, parse_mode='Markdown')
 
-# === FLASK СЕРВЕР ===
-
-app = Flask(__name__)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    update = request.get_json()
-    # Обработка обновлений вручную (без polling)
-    return "OK"
-
-@app.route('/new_order', methods=['POST'])
-def receive_order():
-    data = request.json
-    order = {
-        "items": data.get("items"),
-        "address": data.get("address"),
-        "total": data.get("total"),
-        "timestamp": data.get("timestamp")
-    }
-    ORDERS.append(order)
-    save_orders(ORDERS)
-    return jsonify({"status": "success"})
-
 # === ЗАПУСК ===
 
 if __name__ == '__main__':
-    import asyncio
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    async def setup_webhook():
-        application = ApplicationBuilder().token(TOKEN).build()
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("id", get_id))
-        application.add_handler(CommandHandler("admin", admin_command))
-        application.add_handler(CommandHandler("orders", orders_command))
-        application.add_handler(CallbackQueryHandler(show_category))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("id", get_id))
+    application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("orders", orders_command))
+    application.add_handler(CallbackQueryHandler(show_category))
 
-        # Устанавливаем webhook
-        webhook_url = f"https://cracker228githubio-site.up.railway.app/webhook"
-        await application.bot.set_webhook(url=webhook_url)
-
-        # Запускаем Flask
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host='0.0.0.0', port=port)
-
-    asyncio.run(setup_webhook())
+    print("Бот запущен...")
+    application.run_polling()
