@@ -1,3 +1,13 @@
+// Защита от запуска вне Telegram
+if (typeof window.Telegram === 'undefined') {
+  document.body.innerHTML = `
+    <div style="padding:20px; text-align:center; font-family:sans-serif;">
+      <h2>⚠️ Этот сайт работает только внутри Telegram</h2>
+      <p>Откройте его через Mini App в боте @shop_bot</p>
+    </div>
+  `;
+  throw new Error('Not running in Telegram Web App');
+}
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
