@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Товар 1",
+    "description": "Описание товара 1",
+    "price": 1000,
+    "image": "https://via.placeholder.com/200x150"
+  },
+  {
+    "title": "Товар 2",
+    "description": "Описание товара 2",
+    "price": 1500,
+    "image": "https://via.placeholder.com/200x150"
+  },
+  {
+    "title": "Товар 3",
+    "description": "Описание товара 3",
+    "price": 2000,
+    "image": "https://via.placeholder.com/200x150"
+  }
+]
