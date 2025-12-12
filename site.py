@@ -1,12 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from flask import Flask, request, jsonify
-import threading
 import json
-import os  # ← Добавь это
+import os
 
 # === ТОКЕН БОТА ===
-TOKEN = ("8491825768:AAELLjw_sXDTmfxPstskqF3_83d0sbz04XQ")  # ← Берём токен из переменной окружения
+TOKEN = os.getenv("8491825768:AAELLjw_sXDTmfxPstskqF3_83d0sbz04XQ")
 
 # === GIF ===
 WELCOME_GIF_URL = "https://media1.tenor.com/m/nDG2Tu5MyXEAAAAd/jolly-christmas.gif"
@@ -94,6 +93,12 @@ async def show_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app = Flask(__name__)
 
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    update = request.get_json()
+    # Обработка обновлений вручную (без polling)
+    return "OK"
+
 @app.route('/new_order', methods=['POST'])
 def receive_order():
     data = request.json
@@ -109,22 +114,23 @@ def receive_order():
 
 # === ЗАПУСК ===
 
-def run_flask():
-    port = int(os.environ.get("PORT", 5000))  # ← Port от Railway
-    app.run(host='0.0.0.0', port=port)
-
 if __name__ == '__main__':
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
+    import asyncio
 
-    application = ApplicationBuilder().token(TOKEN).build()
+    async def setup_webhook():
+        application = ApplicationBuilder().token(TOKEN).build()
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("id", get_id))
+        application.add_handler(CommandHandler("admin", admin_command))
+        application.add_handler(CommandHandler("orders", orders_command))
+        application.add_handler(CallbackQueryHandler(show_category))
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("id", get_id))
-    application.add_handler(CommandHandler("admin", admin_command))
-    application.add_handler(CommandHandler("orders", orders_command))
-    application.add_handler(CallbackQueryHandler(show_category))
+        # Устанавливаем webhook
+        webhook_url = f"https://cracker228githubio-site.up.railway.app/webhook"
+        await application.bot.set_webhook(url=webhook_url)
 
-    print("Бот и Flask-сервер запущены...")
-    application.run_polling()
+        # Запускаем Flask
+        port = int(os.environ.get("PORT", 5000))
+        app.run(host='0.0.0.0', port=port)
+
+    asyncio.run(setup_webhook())
