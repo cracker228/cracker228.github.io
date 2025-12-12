@@ -138,7 +138,7 @@ window.placeOrder = (total) => {
 
   // Кодируем для передачи через start=...
   const encoded = btoa(encodeURIComponent(message));
-  const orderBotUsername = 'your_order_bot_username'; // ← ЗАМЕНИТЕ НА РЕАЛЬНОЕ ИМЯ ВАШЕГО order_bot
+  const orderBotUsername = 'gierniugegoieoehhepi_bot'; // ← ЗАМЕНИТЕ НА РЕАЛЬНОЕ ИМЯ ВАШЕГО order_bot
 
   const url = `https://t.me/${orderBotUsername}?start=order_${encoded}`;
   window.Telegram.WebApp.openTelegramLink(url);
