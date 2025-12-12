@@ -47,7 +47,7 @@ async function renderCatalog(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`api/catalog${i}.json`);
+      const res = await fetch(`catalog${i}.json`);
       const data = await res.json();
       container.innerHTML += `<h3>${data.name}</h3><div id="cat-${i}"></div>`;
       const catDiv = container.querySelector(`#cat-${i}`);
