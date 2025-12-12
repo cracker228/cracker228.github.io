@@ -1,0 +1,11 @@
+{
+  "root": ".",
+  "headers": {
+    "/**": {
+      "Cache-Control": "no-cache, no-store, must-revalidate"
+    }
+  },
+  "routes": {
+    "/**": "index.html"
+  }
+}
