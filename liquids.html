@@ -273,7 +273,7 @@
     let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 
     // Загрузка товаров
-    fetch('liquids.json') // Теперь используем liquids.json
+    fetch('liquids.json')
       .then(response => response.json())
       .then(products => {
         const container = document.getElementById('products-container');
@@ -411,9 +411,7 @@
       document.getElementById('order-confirm-page').style.display = 'block';
     }
 
-    // === НОВАЯ ФУНКЦИЯ ОТПРАВКИ ЗАКАЗА БОТУ ===
-   const ORDER_ENDPOINT = 'https://cracker228githubio-site.up.railway.app'; // Заменить на реальный URL
-
+    // === НОВАЯ ФУНКЦИЯ ОТПРАВКИ ЗАКАЗА ЧЕРЕЗ TELEGRAM API ===
     function confirmOrder() {
       if (cart.length === 0) {
         alert('Корзина пуста!');
@@ -427,21 +425,27 @@
         timestamp: new Date().toLocaleString()
       };
 
-      // Отправка на сервер (Flask)
-      fetch(ORDER_ENDPOINT, {
+      const botToken = '8491825768:AAF_Ji-9VmypzxF98FiWGBhzqSblhU2jfpk'; // ← ЗАМЕНИТЬ НА СВОЙ ТОКЕН
+      const chatId = '1026424566, 6249163361';   // ← ЗАМЕНИТЬ НА ID АДМИНИСТРАТОРА
+
+      const message = `📦 Новый заказ!\n\n${orderInfo.items}\n\n📍 Адрес: ${orderInfo.address}\n💰 Итого: ${orderInfo.total} руб.\n🕒 Время: ${orderInfo.timestamp}`;
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(orderInfo)
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message
+        })
       })
       .then(response => response.json())
       .then(data => {
-        if (data.status === 'success') {
+        if (data.ok) {
           alert('Заказ успешно отправлен курьеру!');
           cart = [];
           localStorage.removeItem('cart');
-          // Переключение на главную
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           document.querySelector('[data-tab="catalog"]').classList.add('active');
           document.getElementById('order-confirm-page').style.display = 'none';
