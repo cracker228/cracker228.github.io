@@ -14,10 +14,14 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 
 // === НАВИГАЦИЯ ===
 function navigate(page) {
-  renderNavbar(page);
-  const content = document.getElementById('content');
-  switch (page) {
-    case 'catalog':
+  function renderNavbar(active) {
+  const nav = document.getElementById('navbar');
+  nav.innerHTML = `
+    <button onclick="navigate('catalog')" class="${active === 'catalog' ? 'active' : ''}">🛍️</button>
+    <button onclick="navigate('cart')" class="${active === 'cart' ? 'active' : ''}">🛒</button>
+    <button onclick="navigate('profile')" class="${active === 'profile' ? 'active' : ''}">👤</button>
+  `;
+}
       renderCatalog(content);
       break;
     case 'cart':
