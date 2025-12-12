@@ -1,0 +1,8 @@
+{
+  "root": "shop-mini-app/",
+  "headers": {
+    "/**": {
+      "Cache-Control": "no-cache, no-store, must-revalidate"
+    }
+  }
+}
