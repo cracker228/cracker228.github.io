@@ -3,18 +3,18 @@
     "title": "Товар 1",
     "description": "Описание товара 1",
     "price": 1000,
-    "image": "site.png"
+    "image": "https://github.com/cracker228/cracker228.github.io/blob/26e9dbe82186f070777a007d592bbe6e6e50682e/site.png"
   },
   {
     "title": "Товар 2",
     "description": "Описание товара 2",
     "price": 1500,
-    "image": "site.png"
+    "image": "https://github.com/cracker228/cracker228.github.io/blob/26e9dbe82186f070777a007d592bbe6e6e50682e/site.png"
   },
   {
     "title": "Товар 3",
     "description": "Описание товара 3",
     "price": 2000,
-    "image": "site.png"
+    "image": "https://github.com/cracker228/cracker228.github.io/blob/26e9dbe82186f070777a007d592bbe6e6e50682e/site.png"
   }
 ]
