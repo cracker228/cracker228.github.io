@@ -19,9 +19,7 @@ function navigate(page) {
   nav.innerHTML = `
     <button onclick="navigate('catalog')" class="${active === 'catalog' ? 'active' : ''}">🛍️</button>
     <button onclick="navigate('cart')" class="${active === 'cart' ? 'active' : ''}">🛒</button>
-    <button onclick="navigate('profile')" class="${active === 'profile' ? 'active' : ''}">👤</button>
-  `;
-}
+    <button onclick="navigate('profile')" class="${active === 'profile' ? 'active' : ''}">👤</button>:
       renderCatalog(content);
       break;
     case 'cart':
