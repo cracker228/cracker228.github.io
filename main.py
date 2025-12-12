@@ -2,7 +2,7 @@ from telegram import Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
 
-TOKEN_SHOP = os.getenv("8491825768:AAEMgvXN3kAhEZkancl-ePJ37_wNzjmPXrk")  # Токен бота магазина
+TOKEN_SHOP = os.getenv("8433153883:AAFHZSGxBs9yaUoWWQbcqJeyCBtL4KwUOxM")  # Токен бота магазина
 URL_MINI_APP = "cracker228githubio-site.up.railway.app"  # Заменить на URL мини-приложения
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
