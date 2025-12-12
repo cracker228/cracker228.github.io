@@ -4,7 +4,7 @@ import json
 import os
 
 # === ТОКЕН БОТА ===
-TOKEN = ("")
+TOKEN = ("8491825768:AAEMgvXN3kAhEZkancl-ePJ37_wNzjmPXrk")
 
 # === GIF ===
 WELCOME_GIF_URL = "https://media1.tenor.com/m/nDG2Tu5MyXEAAAAd/jolly-christmas.gif"
