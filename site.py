@@ -6,7 +6,7 @@ import json
 import os  # ← Добавь это
 
 # === ТОКЕН БОТА ===
-TOKEN = ("8491825768:AAF_Ji-9VmypzxF98FiWGBhzqSblhU2jfpk")  # ← Берём токен из переменной окружения
+TOKEN = ("8491825768:AAELLjw_sXDTmfxPstskqF3_83d0sbz04XQ")  # ← Берём токен из переменной окружения
 
 # === GIF ===
 WELCOME_GIF_URL = "https://media1.tenor.com/m/nDG2Tu5MyXEAAAAd/jolly-christmas.gif"
