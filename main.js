@@ -161,6 +161,7 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
+    // УБЕРИТЕ ЛИШНИЕ ПРОБЕЛЫ В URL!
     const res = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,7 +176,7 @@ window.placeOrder = async (total) => {
       alert('❌ Ошибка отправки заказа');
     }
   } catch (e) {
-    alert('❌ Ошибка сети');
+    alert('❌ Ошибка сети: проверьте подключение или сервер');
   }
 };
   }
