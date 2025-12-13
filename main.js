@@ -178,7 +178,7 @@ window.placeOrder = async (total) => {
     }
   } catch (e) {
     alert('❌ Ошибка сети');
-  }
+ };
 
   const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
   const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
