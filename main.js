@@ -12,6 +12,7 @@ if (typeof window.Telegram === 'undefined') {
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
+let currentCatalogId = null; // Для хранения текущего каталога
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
@@ -25,14 +26,18 @@ function renderNavbar(active) {
 }
 
 // === НАВИГАЦИЯ ===
-function navigate(page) {
+function navigate(page, catalogId = null) {
   renderNavbar(page);
   const content = document.getElementById('content');
   if (!content) return;
 
   switch (page) {
     case 'catalog':
-      renderCatalog(content);
+      renderCatalogList(content);
+      break;
+    case 'catalog-items':
+      currentCatalogId = catalogId;
+      renderCatalogItems(content, catalogId);
       break;
     case 'cart':
       renderCart(content);
@@ -41,42 +46,69 @@ function navigate(page) {
       renderProfile(content);
       break;
     default:
-      renderCatalog(content);
+      renderCatalogList(content);
   }
 }
 
-// === КАТАЛОГ ===
-async function renderCatalog(container) {
+// === СТРАНИЦА: СПИСОК КАТАЛОГОВ ===
+function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      // ← Все файлы должны быть в одной папке! Выберите ОДИН вариант:
-      const res = await fetch(`catalog${i}.json`); // ← рекомендуется
-      // const res = await fetch(`catalog${i}.json`); // ← если файлы в корне
-      if (!res.ok) throw new Error('404');
-      const data = await res.json();
-      container.innerHTML += `<h3>${data.name}</h3><div id="cat-${i}"></div>`;
-      const catDiv = container.querySelector(`#cat-${i}`);
-      data.items.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.dataset.id = item.id;
-        card.dataset.name = item.name;
-        card.dataset.cat = i;
-        card.innerHTML = `<strong>${item.name}</strong><br><small>${item.description}</small>`;
-        card.onclick = () => showSubcategories(item, i);
-        catDiv.appendChild(card);
-      });
+      // Проверяем доступность каталога
+      fetch(`api/catalog${i}.json`)
+        .then(res => {
+          if (res.ok) {
+            container.innerHTML += `
+              <button onclick="navigate('catalog-items', ${i})" 
+                      style="width:100%; padding:12px; margin:8px 0; background:#f0f0f0; border:none; border-radius:8px; text-align:left;">
+                Каталог ${i}
+              </button>
+            `;
+          } else {
+            container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
+          }
+        })
+        .catch(() => {
+          container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
+        });
     } catch (e) {
-      console.error(`Ошибка загрузки catalog${i}.json:`, e);
       container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
     }
   }
 }
 
-async function showSubcategories(item, catIndex) {
+// === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
+async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`catalog${catIndex}.json`);
+    const res = await fetch(`api/catalog${catalogId}.json`);
+    if (!res.ok) throw new Error('404');
+    const data = await res.json();
+    
+    container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
+    const itemsDiv = container.querySelector('#items-list');
+
+    data.items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.dataset.id = item.id;
+      card.dataset.name = item.name;
+      card.dataset.cat = catalogId;
+      card.innerHTML = `<strong>${item.name}</strong><br><small>${item.description}</small>`;
+      card.onclick = () => showVariants(item, catalogId);
+      itemsDiv.appendChild(card);
+    });
+
+  } catch (e) {
+    console.error(`Ошибка загрузки каталога ${catalogId}:`, e);
+    container.innerHTML = `<p style="color:red;">❌ Ошибка загрузки каталога ${catalogId}</p>`;
+  }
+}
+
+// === ПОКАЗАТЬ ВАРИАЦИИ ТОВАРА ===
+async function showVariants(item, catalogId) {
+  try {
+    const res = await fetch(`api/catalog${catalogId}.json`);
     if (!res.ok) throw new Error();
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
@@ -92,15 +124,15 @@ async function showSubcategories(item, catIndex) {
         `;
       });
     } else {
-      html += '<p>Подкатегории не найдены.</p>';
+      html += '<p>Вариации не найдены.</p>';
     }
     document.getElementById('content').innerHTML = html;
   } catch (e) {
-    document.getElementById('content').innerHTML = '<p style="color:red;">Ошибка загрузки подкатегорий.</p>';
+    document.getElementById('content').innerHTML = '<p style="color:red;">Ошибка загрузки вариаций.</p>';
   }
 }
 
-// === ГЛОБАЛЬНЫЕ ФУНКЦИИ (доступны из onclick) ===
+// === ГЛОБАЛЬНЫЕ ФУНКЦИИ ===
 window.confirmAddToCart = (id, name, type, price) => {
   if (confirm(`Добавить "${type}" в корзину за ${price} ₽?`)) {
     cart.push({ id, name, type, price: Number(price) });
@@ -131,9 +163,9 @@ window.placeOrder = (total) => {
   let message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   const encoded = btoa(encodeURIComponent(message));
-  const orderBotUsername = 'gierniugegoieoehhepi_bot'; // ← Убедитесь, что имя верное!
+  const orderBotUsername = 'gierniugegoieoehhepi_bot';
 
-  const url = `https://t.me/${orderBotUsername}?start=order_${encoded}`; // ← УБРАЛ ПРОБЕЛЫ!
+  const url = `https://t.me/${orderBotUsername}?start=order_${encoded}`;
   window.Telegram.WebApp.openTelegramLink(url);
 };
 
