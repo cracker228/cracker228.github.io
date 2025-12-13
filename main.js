@@ -83,7 +83,6 @@ async function renderCatalogItems(container, catalogId) {
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
-      // Поддержка изображений (если есть поле "image")
       const imgTag = item.image
         ? `<img src="${item.image}" alt="${item.name}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">`
         : '';
@@ -145,6 +144,7 @@ window.removeFromCart = (index) => {
   navigate('cart');
 };
 
+// === ОФОРМЛЕНИЕ ЗАКАЗА (только через Replit) ===
 window.placeOrder = async (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
@@ -161,38 +161,26 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    // УБЕРИТЕ ЛИШНИЕ ПРОБЕЛЫ В URL!
-    const res = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
+    // 🔥 УБРАЛ ЛИШНИЕ ПРОБЕЛЫ В URL!
+    const response = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
     });
-    if (res.ok) {
+
+    if (response.ok) {
       alert('✅ Заказ отправлен!');
       cart = [];
       localStorage.setItem('cart', JSON.stringify(cart));
       navigate('catalog');
     } else {
-      alert('❌ Ошибка отправки заказа');
+      alert('❌ Ошибка сервера. Попробуйте позже.');
     }
   } catch (e) {
-    alert('❌ Ошибка сети: проверьте подключение или сервер');
+    console.error('Ошибка сети:', e);
+    alert('❌ Не удалось отправить заказ. Проверьте интернет.');
   }
 };
-  }
-
-  const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
-  const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
-  const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
-
-  // --- ВАЖНО: замените на имя ВАШЕГО бота (того же, что открывает Mini App) ---
-  const orderBotUsername = 'gierniugegoieoehhepi_bot'; // ← ЗАМЕНИТЕ НА РЕАЛЬНОЕ ИМЯ!
-
-  // УБРАЛ ЛИШНИЕ ПРОБЕЛЫ:
-  const url = `https://t.me/${orderBotUsername}?start=order_${btoa(encodeURIComponent(message))}`;
-
-  window.Telegram.WebApp.openTelegramLink(url);
-;
 
 // === СТРАНИЦЫ ===
 function renderCart(container) {
@@ -200,7 +188,7 @@ function renderCart(container) {
     container.innerHTML = '<h2>🛒 Ваша корзина пуста</h2>';
     return;
   }
-  let total = cart.reduce((sum, item) => sum + item.price, 0);
+  const total = cart.reduce((sum, item) => sum + item.price, 0);
   let html = `<h2>🛒 Корзина</h2><ul style="list-style:none; padding:0;">`;
   cart.forEach((item, index) => {
     html += `
@@ -226,15 +214,12 @@ function renderCart(container) {
 function renderProfile(container) {
   container.innerHTML = `
     <h2>👤 Личный кабинет</h2>
-    
     <label style="display:block; margin:12px 0;">Адрес доставки:
       <textarea id="delivery-address" rows="3" placeholder="Улица, дом, квартира..." style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">${deliveryAddress}</textarea>
     </label>
-
     <label style="display:block; margin:12px 0;">Телефон для связи:
       <input type="tel" id="phone-number" placeholder="+7 (999) 123-45-67" value="${phoneNumber}" style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">
     </label>
-
     <button onclick="saveProfile()" style="width:100%; padding:12px; background:#8a6dff; color:white; border:none; border-radius:8px; font-weight:bold;">💾 Сохранить</button>
   `;
 }
