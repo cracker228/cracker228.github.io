@@ -77,31 +77,33 @@ async function renderCatalogList(container) {
 }
 
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
-async function renderCatalogItems(container, catalogId) {
+async function showVariants(item, catalogId) {
   try {
     const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
-    if (!res.ok) throw new Error('404');
     const data = await res.json();
+    const targetItem = data.items.find(it => it.id === item.id);
 
-    container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
-    const itemsDiv = container.querySelector('#items-list');
+    let html = `<h3>${item.name}</h3>`;
 
-    data.items.forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'product-card';
-      const imgTag = item.image
-        ? `<img src="${item.image}" alt="${item.name}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">`
-        : '';
-      card.innerHTML = `
-        ${imgTag}
-        <strong>${item.name}</strong><br>
-        <small>${item.description}</small>
-      `;
-      card.onclick = () => showVariants(item, catalogId);
-      itemsDiv.appendChild(card);
-    });
+    if (targetItem?.subcategories?.length) {
+      targetItem.subcategories.forEach(sub => {
+        // Показываем изображение вариации, если есть
+        if (sub.image) {
+          html += `<img src="${sub.image}" alt="${sub.type}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin:8px 0;">`;
+        }
+        html += `
+          <button class="subcat"
+                  onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
+            ${sub.type} — ${sub.price} ₽
+          </button><br>
+        `;
+      });
+    } else {
+      html += '<p>Вариации не найдены.</p>';
+    }
+    document.getElementById('content').innerHTML = html;
   } catch (e) {
-    container.innerHTML = `<p style="color:#ff6b6b;">❌ Ошибка загрузки каталога</p>`;
+    document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки.</p>';
   }
 }
 
