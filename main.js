@@ -191,7 +191,7 @@ window.placeOrder = async (total) => {
   const url = `https://t.me/${orderBotUsername}?start=order_${btoa(encodeURIComponent(message))}`;
 
   window.Telegram.WebApp.openTelegramLink(url);
-};
+;
 
 // === СТРАНИЦЫ ===
 function renderCart(container) {
