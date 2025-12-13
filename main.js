@@ -15,6 +15,9 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
+// === URL вашего Replit-сервера ===
+const REPLIT_API_URL = 'https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev';
+
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
   const nav = document.getElementById('navbar');
@@ -51,12 +54,12 @@ function navigate(page, catalogId = null) {
   }
 }
 
-// === СТРАНИЦА: СПИСОК КАТАЛОГОВ (названия из JSON) ===
+// === СТРАНИЦА: СПИСОК КАТАЛОГОВ (названия из JSON с Replit) ===
 async function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`api/catalog${i}.json`);
+      const res = await fetch(`${REPLIT_API_URL}/api/catalog${i}.json`);
       if (res.ok) {
         const data = await res.json();
         const catalogName = data.name || `Каталог ${i}`;
@@ -76,7 +79,7 @@ async function renderCatalogList(container) {
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`api/catalog${catalogId}.json`);
+    const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
 
@@ -105,7 +108,7 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ ТОВАРА ===
 async function showVariants(item, catalogId) {
   try {
-    const res = await fetch(`api/catalog${catalogId}.json`);
+    const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
@@ -164,8 +167,8 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    // 🔥 Исправлен URL: убраны пробелы в конце!
-    const response = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
+    // 🔥 Убраны пробелы в URL!
+    const response = await fetch(`${REPLIT_API_URL}/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
