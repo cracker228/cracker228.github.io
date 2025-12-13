@@ -1,0 +1,24 @@
+{
+  "name": "Каталог 1",
+  "items": [
+    {
+      "id": "item1",
+      "name": "Футболка",
+      "description": "Хлопковая футболка с принтом.",
+      "subcategories": [
+        { "type": "S", "price": 800 },
+        { "type": "M", "price": 850 },
+        { "type": "L", "price": 900 }
+      ]
+    },
+    {
+      "id": "item2",
+      "name": "Кружка",
+      "description": "Керамическая кружка 350 мл.",
+      "subcategories": [
+        { "type": "Белая", "price": 300 },
+        { "type": "Чёрная", "price": 320 }
+      ]
+    }
+  ]
+}
