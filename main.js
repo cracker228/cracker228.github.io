@@ -148,7 +148,7 @@ window.removeFromCart = (index) => {
   navigate('cart');
 };
 
-window.placeOrder = (total) => {
+window.placeOrder = async (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
 
@@ -156,6 +156,28 @@ window.placeOrder = (total) => {
     alert('❗ Укажите адрес доставки в личном кабинете!');
     navigate('profile');
     return;
+  }
+
+  const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
+  const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
+  let message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
+
+  try {
+    const res = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    if (res.ok) {
+      alert('✅ Заказ отправлен!');
+      cart = [];
+      localStorage.setItem('cart', JSON.stringify(cart));
+      navigate('catalog');
+    } else {
+      alert('❌ Ошибка отправки заказа');
+    }
+  } catch (e) {
+    alert('❌ Ошибка сети');
   }
 
   const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
