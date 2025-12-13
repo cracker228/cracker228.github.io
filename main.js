@@ -1,7 +1,7 @@
 // Защита от запуска вне Telegram
 if (typeof window.Telegram === 'undefined') {
   document.body.innerHTML = `
-    <div style="padding:20px; text-align:center; font-family:sans-serif;">
+    <div style="padding:20px; text-align:center; font-family:sans-serif; color:#e0e0e0; background:#121212; min-height:100vh; display:flex; flex-direction:column; justify-content:center;">
       <h2>⚠️ Этот сайт работает только внутри Telegram</h2>
       <p>Откройте его через Mini App в боте</p>
     </div>
@@ -12,6 +12,7 @@ if (typeof window.Telegram === 'undefined') {
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
+let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
@@ -59,7 +60,7 @@ function renderCatalogList(container) {
         if (res.ok) {
           container.innerHTML += `
             <button onclick="navigate('catalog-items', ${i})"
-                    style="width:100%; padding:12px; margin:8px 0; background:#f0f0f0; border:none; border-radius:8px; text-align:left;">
+                    style="width:100%; padding:12px; margin:8px 0; background:#2a2a2a; color:#e0e0e0; border:none; border-radius:12px; text-align:left; font-size:16px;">
               Каталог ${i}
             </button>
           `;
@@ -82,12 +83,20 @@ async function renderCatalogItems(container, catalogId) {
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
-      card.innerHTML = `<strong>${item.name}</strong><br><small>${item.description}</small>`;
+      // Поддержка изображений (если есть поле "image")
+      const imgTag = item.image
+        ? `<img src="${item.image}" alt="${item.name}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">`
+        : '';
+      card.innerHTML = `
+        ${imgTag}
+        <strong>${item.name}</strong><br>
+        <small>${item.description}</small>
+      `;
       card.onclick = () => showVariants(item, catalogId);
       itemsDiv.appendChild(card);
     });
   } catch (e) {
-    container.innerHTML = `<p style="color:red;">Ошибка загрузки каталога</p>`;
+    container.innerHTML = `<p style="color:#ff6b6b;">❌ Ошибка загрузки каталога</p>`;
   }
 }
 
@@ -99,6 +108,9 @@ async function showVariants(item, catalogId) {
     const targetItem = data.items.find(it => it.id === item.id);
 
     let html = `<h3>${item.name}</h3>`;
+    if (targetItem?.image) {
+      html += `<img src="${targetItem.image}" alt="${item.name}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:12px;">`;
+    }
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
         html += `
@@ -113,7 +125,7 @@ async function showVariants(item, catalogId) {
     }
     document.getElementById('content').innerHTML = html;
   } catch (e) {
-    document.getElementById('content').innerHTML = '<p style="color:red;">Ошибка загрузки.</p>';
+    document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки.</p>';
   }
 }
 
@@ -133,48 +145,28 @@ window.removeFromCart = (index) => {
   navigate('cart');
 };
 
-window.placeOrder = async (total) => {
+window.placeOrder = (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
+  const phone = phoneNumber.trim();
 
-  if (!address) {
-    alert('Укажите адрес доставки в личном кабинете!');
+  if (!address || !phone) {
+    alert('❗ Заполните адрес и телефон в личном кабинете!');
     navigate('profile');
     return;
   }
 
   const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
   const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
-  const message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
+  const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
-  try {
-    const res = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
-    });
-    if (res.ok) {
-      alert('✅ Заказ отправлен!');
-      cart = [];
-      localStorage.setItem('cart', JSON.stringify(cart));
-      navigate('catalog');
-    } else {
-      alert('Ошибка отправки заказа');
-    }
-  } catch (e) {
-    alert('Ошибка сети');
-  }
-};
+  // --- ВАЖНО: замените на имя ВАШЕГО бота (того же, что открывает Mini App) ---
+  const orderBotUsername = 'gierniugegoieoehhepi_bot'; // ← ЗАМЕНИТЕ НА РЕАЛЬНОЕ ИМЯ!
 
-window.saveAddress = () => {
-  const addr = document.getElementById('delivery-address')?.value?.trim();
-  if (addr) {
-    deliveryAddress = addr;
-    localStorage.setItem('deliveryAddress', addr);
-    alert('✅ Адрес сохранён!');
-  } else {
-    alert('Введите адрес.');
-  }
+  // УБРАЛ ЛИШНИЕ ПРОБЕЛЫ:
+  const url = `https://t.me/${orderBotUsername}?start=order_${btoa(encodeURIComponent(message))}`;
+
+  window.Telegram.WebApp.openTelegramLink(url);
 };
 
 // === СТРАНИЦЫ ===
@@ -184,16 +176,19 @@ function renderCart(container) {
     return;
   }
   let total = cart.reduce((sum, item) => sum + item.price, 0);
-  let html = `<h2>🛒 Корзина</h2><ul>`;
+  let html = `<h2>🛒 Корзина</h2><ul style="list-style:none; padding:0;">`;
   cart.forEach((item, index) => {
-    html += `<li>${item.name} (${item.type}) — ${item.price} ₽
-      <button onclick="removeFromCart(${index})" style="float:right; background:#dc3545; border:none; color:white; border-radius:4px;">❌</button>
-    </li>`;
+    html += `
+      <li style="background:#2a2a2a; padding:12px; margin:8px 0; border-radius:8px;">
+        ${item.name} (${item.type}) — ${item.price} ₽
+        <button onclick="removeFromCart(${index})" style="float:right; background:#ff6b6b; border:none; color:white; border-radius:4px; padding:4px 8px;">❌</button>
+      </li>
+    `;
   });
   html += `</ul><p><strong>Итого: ${total} ₽</strong></p>`;
   html += `
     <label>Способ оплаты:
-      <select id="payment-method">
+      <select id="payment-method" style="width:100%; padding:10px; margin:8px 0; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">
         <option value="cash">Наличными</option>
         <option value="transfer">Переводом</option>
       </select>
@@ -206,12 +201,38 @@ function renderCart(container) {
 function renderProfile(container) {
   container.innerHTML = `
     <h2>👤 Личный кабинет</h2>
-    <label>Адрес доставки:
-      <textarea id="delivery-address" rows="4" placeholder="Улица, дом, квартира...">${deliveryAddress}</textarea>
-    </label><br>
-    <button onclick="saveAddress()">💾 Сохранить адрес</button>
+    
+    <label style="display:block; margin:12px 0;">Адрес доставки:
+      <textarea id="delivery-address" rows="3" placeholder="Улица, дом, квартира..." style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">${deliveryAddress}</textarea>
+    </label>
+
+    <label style="display:block; margin:12px 0;">Телефон для связи:
+      <input type="tel" id="phone-number" placeholder="+7 (999) 123-45-67" value="${phoneNumber}" style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">
+    </label>
+
+    <button onclick="saveProfile()" style="width:100%; padding:12px; background:#8a6dff; color:white; border:none; border-radius:8px; font-weight:bold;">💾 Сохранить</button>
   `;
 }
+
+window.saveProfile = () => {
+  const addr = document.getElementById('delivery-address').value.trim();
+  const phone = document.getElementById('phone-number').value.trim();
+
+  if (!addr) {
+    alert('❗ Укажите адрес доставки.');
+    return;
+  }
+  if (!phone) {
+    alert('❗ Укажите номер телефона.');
+    return;
+  }
+
+  deliveryAddress = addr;
+  phoneNumber = phone;
+  localStorage.setItem('deliveryAddress', addr);
+  localStorage.setItem('phoneNumber', phone);
+  alert('✅ Профиль сохранён!');
+};
 
 // === ЗАПУСК ===
 document.addEventListener('DOMContentLoaded', () => {
