@@ -51,22 +51,25 @@ function navigate(page, catalogId = null) {
   }
 }
 
-// === СТРАНИЦА: СПИСОК КАТАЛОГОВ ===
-function renderCatalogList(container) {
+// === СТРАНИЦА: СПИСОК КАТАЛОГОВ (названия из JSON) ===
+async function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
-    fetch(`api/catalog${i}.json`)
-      .then(res => {
-        if (res.ok) {
-          container.innerHTML += `
-            <button onclick="navigate('catalog-items', ${i})"
-                    style="width:100%; padding:12px; margin:8px 0; background:#2a2a2a; color:#e0e0e0; border:none; border-radius:12px; text-align:left; font-size:16px;">
-              Каталог ${i}
-            </button>
-          `;
-        }
-      })
-      .catch(() => {});
+    try {
+      const res = await fetch(`api/catalog${i}.json`);
+      if (res.ok) {
+        const data = await res.json();
+        const catalogName = data.name || `Каталог ${i}`;
+        container.innerHTML += `
+          <button onclick="navigate('catalog-items', ${i})"
+                  style="width:100%; padding:12px; margin:8px 0; background:#2a2a2a; color:#e0e0e0; border:none; border-radius:12px; text-align:left; font-size:16px;">
+            ${catalogName}
+          </button>
+        `;
+      }
+    } catch (e) {
+      // Пропустить недоступный каталог
+    }
   }
 }
 
@@ -144,7 +147,7 @@ window.removeFromCart = (index) => {
   navigate('cart');
 };
 
-// === ОФОРМЛЕНИЕ ЗАКАЗА (только через Replit) ===
+// === ОФОРМЛЕНИЕ ЗАКАЗА ===
 window.placeOrder = async (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
@@ -161,7 +164,7 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    // 🔥 УБРАЛ ЛИШНИЕ ПРОБЕЛЫ В URL!
+    // 🔥 Исправлен URL: убраны пробелы в конце!
     const response = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
