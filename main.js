@@ -15,7 +15,7 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
-// === URL вашего Replit-сервера ===
+// === URL Replit (БЕЗ пробелов!) ===
 const REPLIT_API_URL = 'https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev';
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
@@ -54,7 +54,7 @@ function navigate(page, catalogId = null) {
   }
 }
 
-// === СТРАНИЦА: СПИСОК КАТАЛОГОВ (названия из JSON с Replit) ===
+// === СТРАНИЦА: СПИСОК КАТАЛОГОВ ===
 async function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
@@ -71,43 +71,38 @@ async function renderCatalogList(container) {
         `;
       }
     } catch (e) {
-      // Пропустить недоступный каталог
+      console.error('Ошибка загрузки каталога', i, e);
     }
   }
 }
 
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
-async function showVariants(item, catalogId) {
+async function renderCatalogItems(container, catalogId) {
   try {
     const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
+    if (!res.ok) throw new Error('404');
     const data = await res.json();
-    const targetItem = data.items.find(it => it.id === item.id);
 
-    let html = `<h3>${item.name}</h3>`;
+    container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
+    const itemsDiv = container.querySelector('#items-list');
 
-    if (targetItem?.subcategories?.length) {
-      targetItem.subcategories.forEach(sub => {
-        // Показываем изображение вариации, если есть
-        if (sub.image) {
-          html += `<img src="${sub.image}" alt="${sub.type}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin:8px 0;">`;
-        }
-        html += `
-          <button class="subcat"
-                  onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
-            ${sub.type} — ${sub.price} ₽
-          </button><br>
-        `;
-      });
-    } else {
-      html += '<p>Вариации не найдены.</p>';
-    }
-    document.getElementById('content').innerHTML = html;
+    data.items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      // НЕТ общего изображения — только вариации
+      card.innerHTML = `
+        <strong>${item.name}</strong><br>
+        <small>${item.description}</small>
+      `;
+      card.onclick = () => showVariants(item, catalogId);
+      itemsDiv.appendChild(card);
+    });
   } catch (e) {
-    document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки.</p>';
+    container.innerHTML = `<p style="color:#ff6b6b;">❌ Ошибка загрузки каталога</p>`;
   }
 }
 
-// === ПОКАЗАТЬ ВАРИАЦИИ ТОВАРА ===
+// === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
     const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
@@ -115,11 +110,11 @@ async function showVariants(item, catalogId) {
     const targetItem = data.items.find(it => it.id === item.id);
 
     let html = `<h3>${item.name}</h3>`;
-    if (targetItem?.image) {
-      html += `<img src="${targetItem.image}" alt="${item.name}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:12px;">`;
-    }
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
+        if (sub.image) {
+          html += `<img src="${sub.image}" alt="${sub.type}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin:8px 0;">`;
+        }
         html += `
           <button class="subcat"
                   onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
@@ -152,7 +147,6 @@ window.removeFromCart = (index) => {
   navigate('cart');
 };
 
-// === ОФОРМЛЕНИЕ ЗАКАЗА ===
 window.placeOrder = async (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
@@ -169,7 +163,6 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    // 🔥 Убраны пробелы в URL!
     const response = await fetch(`${REPLIT_API_URL}/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,6 +244,9 @@ window.saveProfile = () => {
   localStorage.setItem('phoneNumber', phone);
   alert('✅ Профиль сохранён!');
 };
+
+// === ГЛОБАЛЬНЫЙ ДОСТУП ===
+window.navigate = navigate;
 
 // === ЗАПУСК ===
 document.addEventListener('DOMContentLoaded', () => {
