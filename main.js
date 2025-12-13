@@ -163,7 +163,7 @@ window.placeOrder = (total) => {
   let message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   const encoded = btoa(encodeURIComponent(message));
-  const orderBotUsername = '@gierniugegoieoehhepi_bot';
+  const orderBotUsername = 'gierniugegoieoehhepi_bot';
 
   const url = `https://t.me/${orderBotUsername}?start=order_${encoded}`;
   window.Telegram.WebApp.openTelegramLink(url);
