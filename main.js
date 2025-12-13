@@ -3,7 +3,7 @@ if (typeof window.Telegram === 'undefined') {
   document.body.innerHTML = `
     <div style="padding:20px; text-align:center; font-family:sans-serif;">
       <h2>⚠️ Этот сайт работает только внутри Telegram</h2>
-      <p>Откройте его через Mini App в боте @shop_bot</p>
+      <p>Откройте его через Mini App в боте</p>
     </div>
   `;
   throw new Error('Not running in Telegram Web App');
@@ -12,7 +12,7 @@ if (typeof window.Telegram === 'undefined') {
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
-let currentCatalogId = null; // Для хранения текущего каталога
+let currentCatalogId = null;
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
@@ -54,27 +54,18 @@ function navigate(page, catalogId = null) {
 function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
-    try {
-      // Проверяем доступность каталога
-      fetch(`api/catalog${i}.json`)
-        .then(res => {
-          if (res.ok) {
-            container.innerHTML += `
-              <button onclick="navigate('catalog-items', ${i})" 
-                      style="width:100%; padding:12px; margin:8px 0; background:#f0f0f0; border:none; border-radius:8px; text-align:left;">
-                Каталог ${i}
-              </button>
-            `;
-          } else {
-            container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
-          }
-        })
-        .catch(() => {
-          container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
-        });
-    } catch (e) {
-      container.innerHTML += `<p style="color:red;">❌ Каталог ${i} недоступен</p>`;
-    }
+    fetch(`api/catalog${i}.json`)
+      .then(res => {
+        if (res.ok) {
+          container.innerHTML += `
+            <button onclick="navigate('catalog-items', ${i})"
+                    style="width:100%; padding:12px; margin:8px 0; background:#f0f0f0; border:none; border-radius:8px; text-align:left;">
+              Каталог ${i}
+            </button>
+          `;
+        }
+      })
+      .catch(() => {});
   }
 }
 
@@ -84,24 +75,19 @@ async function renderCatalogItems(container, catalogId) {
     const res = await fetch(`api/catalog${catalogId}.json`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
-    
+
     container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
     const itemsDiv = container.querySelector('#items-list');
 
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
-      card.dataset.id = item.id;
-      card.dataset.name = item.name;
-      card.dataset.cat = catalogId;
       card.innerHTML = `<strong>${item.name}</strong><br><small>${item.description}</small>`;
       card.onclick = () => showVariants(item, catalogId);
       itemsDiv.appendChild(card);
     });
-
   } catch (e) {
-    console.error(`Ошибка загрузки каталога ${catalogId}:`, e);
-    container.innerHTML = `<p style="color:red;">❌ Ошибка загрузки каталога ${catalogId}</p>`;
+    container.innerHTML = `<p style="color:red;">Ошибка загрузки каталога</p>`;
   }
 }
 
@@ -109,7 +95,6 @@ async function renderCatalogItems(container, catalogId) {
 async function showVariants(item, catalogId) {
   try {
     const res = await fetch(`api/catalog${catalogId}.json`);
-    if (!res.ok) throw new Error();
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
@@ -117,7 +102,7 @@ async function showVariants(item, catalogId) {
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
         html += `
-          <button class="subcat" 
+          <button class="subcat"
                   onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
             ${sub.type} — ${sub.price} ₽
           </button><br>
@@ -128,7 +113,7 @@ async function showVariants(item, catalogId) {
     }
     document.getElementById('content').innerHTML = html;
   } catch (e) {
-    document.getElementById('content').innerHTML = '<p style="color:red;">Ошибка загрузки вариаций.</p>';
+    document.getElementById('content').innerHTML = '<p style="color:red;">Ошибка загрузки.</p>';
   }
 }
 
@@ -153,14 +138,14 @@ window.placeOrder = async (total) => {
   const address = deliveryAddress.trim();
 
   if (!address) {
-    alert('❗ Укажите адрес доставки в личном кабинете!');
+    alert('Укажите адрес доставки в личном кабинете!');
     navigate('profile');
     return;
   }
 
   const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
   const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
-  let message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
+  const message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
     const res = await fetch('https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/order', {
@@ -174,21 +159,11 @@ window.placeOrder = async (total) => {
       localStorage.setItem('cart', JSON.stringify(cart));
       navigate('catalog');
     } else {
-      alert('❌ Ошибка отправки заказа');
+      alert('Ошибка отправки заказа');
     }
   } catch (e) {
-    alert('❌ Ошибка сети');
- };
-
-  const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
-  const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
-  let message = `📦 НОВЫЙ ЗАКАЗ\n\nАдрес: ${address}\nОплата: ${paymentText}\nСумма: ${total} ₽\n\nТовары:\n${itemsText}`;
-
-  const encoded = btoa(encodeURIComponent(message));
-  const orderBotUsername = 'gierniugegoieoehhepi_bot';
-
-  const url = `https://t.me/${orderBotUsername}?start=order_${encoded}`;
-  window.Telegram.WebApp.openTelegramLink(url);
+    alert('Ошибка сети');
+  }
 };
 
 window.saveAddress = () => {
@@ -198,7 +173,7 @@ window.saveAddress = () => {
     localStorage.setItem('deliveryAddress', addr);
     alert('✅ Адрес сохранён!');
   } else {
-    alert('❗ Пожалуйста, введите адрес.');
+    alert('Введите адрес.');
   }
 };
 
