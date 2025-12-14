@@ -15,8 +15,8 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
-// === URL Replit (БЕЗ пробелов!) ===
-const REPLIT_API_URL = 'https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev';
+// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО!) ===
+const API_BASE_URL = 'https://cracker228githubio-site.up.railway.app';
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
@@ -59,7 +59,8 @@ async function renderCatalogList(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${REPLIT_API_URL}/api/catalog${i}.json`);
+      // ✅ Используем Railway URL
+      const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json`);
       if (res.ok) {
         const data = await res.json();
         const catalogName = data.name || `Каталог ${i}`;
@@ -79,7 +80,8 @@ async function renderCatalogList(container) {
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
+    // ✅ Используем Railway URL
+    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
 
@@ -89,7 +91,6 @@ async function renderCatalogItems(container, catalogId) {
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
-      // НЕТ общего изображения — только вариации
       card.innerHTML = `
         <strong>${item.name}</strong><br>
         <small>${item.description}</small>
@@ -105,7 +106,8 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
-    const res = await fetch(`${REPLIT_API_URL}/api/catalog${catalogId}.json`);
+    // ✅ Используем Railway URL
+    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
@@ -163,7 +165,8 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    const response = await fetch(`${REPLIT_API_URL}/order`, {
+    // ✅ Используем Railway URL
+    const response = await fetch(`${API_BASE_URL}/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
