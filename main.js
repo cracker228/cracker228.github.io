@@ -15,7 +15,7 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
-// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО!) ===
+// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО: убраны пробелы!) ===
 const API_BASE_URL = 'https://cracker228githubio-site.up.railway.app';
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
@@ -37,7 +37,7 @@ function navigate(page, catalogId = null) {
 
   switch (page) {
     case 'catalog':
-      renderCatalogList(content);
+      renderCatalogLine(content);
       break;
     case 'catalog-items':
       currentCatalogId = catalogId;
@@ -50,16 +50,15 @@ function navigate(page, catalogId = null) {
       renderProfile(content);
       break;
     default:
-      renderCatalogList(content);
+      renderCatalogLine(content);
   }
 }
 
 // === СТРАНИЦА: СПИСОК КАТАЛОГОВ ===
-async function renderCatalogList(container) {
+async function renderCatalogLine(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      // ✅ Используем Railway URL
       const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json`);
       if (res.ok) {
         const data = await res.json();
@@ -80,7 +79,6 @@ async function renderCatalogList(container) {
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    // ✅ Используем Railway URL
     const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
@@ -91,9 +89,17 @@ async function renderCatalogItems(container, catalogId) {
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
+      // Используем новую разметку с изображением и info-блоком
+      const imgTag = item.image
+        ? `<img src="${item.image}" alt="${item.name}">`
+        : `<div style="height:160px; background:#333; display:flex;align-items:center;justify-content:center;color:#555;">Нет фото</div>`;
+      
       card.innerHTML = `
-        <strong>${item.name}</strong><br>
-        <small>${item.description}</small>
+        ${imgTag}
+        <div class="product-info">
+          <h3>${item.name}</h3>
+          <p>${item.description}</p>
+        </div>
       `;
       card.onclick = () => showVariants(item, catalogId);
       itemsDiv.appendChild(card);
@@ -106,7 +112,6 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
-    // ✅ Используем Railway URL
     const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
@@ -114,14 +119,17 @@ async function showVariants(item, catalogId) {
     let html = `<h3>${item.name}</h3>`;
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
-        if (sub.image) {
-          html += `<img src="${sub.image}" alt="${sub.type}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin:8px 0;">`;
-        }
         html += `
-          <button class="subcat"
-                  onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
-            ${sub.type} — ${sub.price} ₽
-          </button><br>
+          <div class="variant-card">
+            <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
+            <div class="variant-info">
+              <h4>${sub.type}</h4>
+              <div class="price">${sub.price} ₽</div>
+              <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
+                🛒 В корзину
+              </button>
+            </div>
+          </div>
         `;
       });
     } else {
@@ -139,7 +147,8 @@ window.confirmAddToCart = (id, name, type, price) => {
     cart.push({ id, name, type, price: Number(price) });
     localStorage.setItem('cart', JSON.stringify(cart));
     alert('✅ Товар добавлен в корзину!');
-    navigate('cart');
+    // ❌ НЕ ПЕРЕХОДИМ В КОРЗИНУ!
+    // navigate('cart'); ← УДАЛЕНО
   }
 };
 
@@ -165,7 +174,6 @@ window.placeOrder = async (total) => {
   const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
 
   try {
-    // ✅ Используем Railway URL
     const response = await fetch(`${API_BASE_URL}/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -223,7 +231,7 @@ function renderProfile(container) {
     </label>
     <label style="display:block; margin:12px 0;">Телефон для связи:
       <input type="tel" id="phone-number" placeholder="+7 (999) 123-45-67" value="${phoneNumber}" style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">
-    </label>
+    </	label>
     <button onclick="saveProfile()" style="width:100%; padding:12px; background:#8a6dff; color:white; border:none; border-radius:8px; font-weight:bold;">💾 Сохранить</button>
   `;
 }
