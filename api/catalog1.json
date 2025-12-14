@@ -1,0 +1,29 @@
+{
+  "name": "Каталог 1",
+  "items": [
+    {
+      "id": "1765653833636",
+      "name": "Podonki",
+      "description": "PG/VG: 50/50 крепость 70",
+      "image": null,
+      "subcategories": [
+        {
+          "type": "Двойное яблоко",
+          "price": 450
+        }
+      ]
+    },
+    {
+      "id": "1765657373093",
+      "name": "Тест",
+      "description": "Тест",
+      "subcategories": [
+        {
+          "type": "Тест",
+          "price": 1000,
+          "image": "https://98336acf-01d5-468f-8e37-12c8dfdecc91-00-3lkm6n8epp37w.worf.replit.dev/images/1765657353769.jpg"
+        }
+      ]
+    }
+  ]
+}
