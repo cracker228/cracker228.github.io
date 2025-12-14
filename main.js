@@ -15,7 +15,7 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
-// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО: убраны пробелы!) ===
+// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО: УБРАНЫ ПРОБЕЛЫ!) ===
 const API_BASE_URL = 'https://cracker228githubio-site.up.railway.app';
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
@@ -89,7 +89,6 @@ async function renderCatalogItems(container, catalogId) {
     data.items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'product-card';
-      // Используем новую разметку с изображением и info-блоком
       const imgTag = item.image
         ? `<img src="${item.image}" alt="${item.name}">`
         : `<div style="height:160px; background:#333; display:flex;align-items:center;justify-content:center;color:#555;">Нет фото</div>`;
@@ -116,28 +115,28 @@ async function showVariants(item, catalogId) {
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
- let html = `<h3>${item.name}</h3>`;
-if (targetItem?.subcategories?.length) {
-  targetItem.subcategories.forEach(sub => {
-    html += `
-      <div class="variant-card">
-        <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
-        <div class="variant-info">
-          <h4>${sub.type}</h4>
-          <div class="price">${sub.price} ₽</div>
-          <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
-            🛒 В корзину
-          </button>
-        </div>
-      </div>
-  }
-`;
+    let html = `<h3>${item.name}</h3>`;
+    if (targetItem?.subcategories?.length) {
+      targetItem.subcategories.forEach(sub => {
+        html += `
+          <div class="variant-card">
+            <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
+            <div class="variant-info">
+              <h4>${sub.type}</h4>
+              <div class="price">${sub.price} ₽</div>
+              <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', '${sub.type.replace(/'/g, "\\'")}', ${sub.price})">
+                🛒 В корзину
+              </button>
+            </div>
+          </div>
+        `;
       });
     } else {
       html += '<p>Вариации не найдены.</p>';
     }
     document.getElementById('content').innerHTML = html;
   } catch (e) {
+    console.error('Ошибка в showVariants:', e);
     document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки.</p>';
   }
 }
@@ -148,8 +147,7 @@ window.confirmAddToCart = (id, name, type, price) => {
     cart.push({ id, name, type, price: Number(price) });
     localStorage.setItem('cart', JSON.stringify(cart));
     alert('✅ Товар добавлен в корзину!');
-    // ❌ НЕ ПЕРЕХОДИМ В КОРЗИНУ!
-    // navigate('cart'); ← УДАЛЕНО
+    // Не переходим в корзину — остаёмся на странице
   }
 };
 
@@ -232,7 +230,7 @@ function renderProfile(container) {
     </label>
     <label style="display:block; margin:12px 0;">Телефон для связи:
       <input type="tel" id="phone-number" placeholder="+7 (999) 123-45-67" value="${phoneNumber}" style="width:100%; padding:12px; background:#2a2a2a; color:#e0e0e0; border:1px solid #333; border-radius:8px;">
-    </	label>
+    </label>
     <button onclick="saveProfile()" style="width:100%; padding:12px; background:#8a6dff; color:white; border:none; border-radius:8px; font-weight:bold;">💾 Сохранить</button>
   `;
 }
