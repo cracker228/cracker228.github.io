@@ -208,6 +208,11 @@ input, textarea, select {
   color: var(--text);
   font-size: 16px;
 }
+#items-list {
+  overflow-y: auto;
+  height: auto;
+  min-height: 300px; /* Минимальная высота */
+}
 
 /* === Скрываем старые стили при необходимости === */
 #items-list .product-card,
