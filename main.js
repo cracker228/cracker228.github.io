@@ -116,21 +116,22 @@ async function showVariants(item, catalogId) {
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
-    let html = `<h3>${item.name}</h3>`;
-    if (targetItem?.subcategories?.length) {
-      targetItem.subcategories.forEach(sub => {
-        html += `
-          <div class="variant-card">
-            <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
-            <div class="variant-info">
-              <h4>${sub.type}</h4>
-              <div class="price">${sub.price} ₽</div>
-              <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
-                🛒 В корзину
-              </button>
-            </div>
-          </div>
-        `;
+ let html = `<h3>${item.name}</h3>`;
+if (targetItem?.subcategories?.length) {
+  targetItem.subcategories.forEach(sub => {
+    html += `
+      <div class="variant-card">
+        <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
+        <div class="variant-info">
+          <h4>${sub.type}</h4>
+          <div class="price">${sub.price} ₽</div>
+          <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name}', '${sub.type}', ${sub.price})">
+            🛒 В корзину
+          </button>
+        </div>
+      </div>
+  }
+`;
       });
     } else {
       html += '<p>Вариации не найдены.</p>';
