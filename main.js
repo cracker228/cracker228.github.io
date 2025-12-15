@@ -16,7 +16,7 @@ let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
 // === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО: УБРАНЫ ПРОБЕЛЫ!) ===
-const API_BASE_URL = 'https://cracker228githubio-site.up.railway.app';
+const API_BASE_URL = 'https://cracker228githubio-site.up.railway.app'; // ← ТУТ БЫЛО 2 ПРОБЕЛА!
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
@@ -79,7 +79,7 @@ async function renderCatalogLine(container) {
 // === СТРАНИЦА: ТОВАРЫ В КАТАЛОГЕ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
+    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json?_=${Date.now()}`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
 
@@ -90,7 +90,7 @@ async function renderCatalogItems(container, catalogId) {
       const card = document.createElement('div');
       card.className = 'product-card';
       const imgTag = item.image
-        ? `<img src="${item.image}" alt="${item.name}">`
+        ? `<img src="${item.image.trim()}" alt="${item.name}">` // ← trim() на случай пробелов
         : `<div style="height:160px; background:#333; display:flex;align-items:center;justify-content:center;color:#555;">Нет фото</div>`;
       
       card.innerHTML = `
@@ -111,19 +111,22 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json?_=${Date.now()}`);
+    // 🔥 ИСПРАВЛЕНО: было ${i}, стало ${catalogId}
+    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json?_=${Date.now()}`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
     let html = `<h3>${item.name}</h3>`;
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
+        // 🔥 Убраны пробелы из placeholder
+        const cleanImage = (sub.image || '').trim() || 'https://via.placeholder.com/100?text=Нет+фото';
         html += `
           <div class="variant-card">
-            <img src="${sub.image || 'https://via.placeholder.com/100?text=Нет+фото'}" alt="${sub.type}">
+            <img src="${cleanImage}" alt="${sub.type}">
             <div class="variant-info">
               <h4>${sub.type}</h4>
-              <div class="price">${sub.price} ₽</div>
+              <div class "price">${sub.price} ₽</div>
               <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', '${sub.type.replace(/'/g, "\\'")}', ${sub.price})">
                 🛒 В корзину
               </button>
@@ -137,7 +140,7 @@ async function showVariants(item, catalogId) {
     document.getElementById('content').innerHTML = html;
   } catch (e) {
     console.error('Ошибка в showVariants:', e);
-    document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки.</p>';
+    document.getElementById('content').innerHTML = '<p style="color:#ff6b6b;">❌ Ошибка загрузки вариаций</p>';
   }
 }
 
