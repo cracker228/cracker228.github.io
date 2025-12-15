@@ -59,7 +59,7 @@ async function renderCatalogLine(container) {
   container.innerHTML = '<h2>Добро пожаловать в магазин!</h2>';
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json`);
+      const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json?_=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         const catalogName = data.name || `Каталог ${i}`;
@@ -111,7 +111,7 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json`);
+    const res = await fetch(`${API_BASE_URL}/api/catalog${i}.json?_=${Date.now()}`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
 
