@@ -4,8 +4,8 @@
   --text: #e0e0e0;
   --text-secondary: #a0a0a0;
   --border: #333;
-  --button-bg: #8a6dff;
-  --button-hover: #7a5dff;
+  --button-bg: #9c27b0;       /* Фиолетовый как на макете */
+  --button-hover: #7b1fa2;    /* Темнее при наведении */
   --error: #ff6b6b;
   --success: #4caf50;
   --card-radius: 16px;
@@ -72,6 +72,7 @@ body {
 .product-card img {
   width: 100%;
   height: auto;
+  aspect-ratio: 1/1;
   object-fit: cover;
   border-radius: 8px;
   margin-bottom: 10px;
@@ -94,13 +95,14 @@ body {
   line-height: 1.4;
 }
 
-/* === Вариация товара === */
+/* === Вариация товара (как на макете) === */
 .variant-card {
+  display: flex;
+  align-items: center;
   background: var(--card-bg);
   border-radius: var(--card-radius);
   overflow: hidden;
   margin: 12px 0;
-  display: flex;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
@@ -110,7 +112,7 @@ body {
   object-fit: cover;
 }
 
-.variant-info {
+.variant-content {
   padding: 16px;
   flex: 1;
   display: flex;
@@ -118,13 +120,13 @@ body {
   justify-content: space-between;
 }
 
-.variant-info h4 {
+.variant-name {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 4px;
 }
 
-.variant-info .price {
+.variant-price {
   font-size: 18px;
   font-weight: 700;
   color: var(--button-bg);
@@ -136,14 +138,16 @@ body {
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 12px 16px;
   font-weight: 600;
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  width: auto;
-  margin-top: 8px;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 16px;
+  transition: background 0.2s;
 }
 
 .add-to-cart-btn:hover {
@@ -160,25 +164,16 @@ h2 {
   font-size: 24px;
 }
 
-/* === Старые кнопки (оставим для совместимости) === */
-.subcat {
-  display: block;
-  width: 100%;
-  padding: 14px;
-  margin: 10px 0;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--card-radius);
-  color: var(--text);
-  text-align: left;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background 0.2s;
+/* === Прокрутка каталога === */
+#items-list {
+  overflow-y: auto;
+  min-height: 300px;
+  padding: 8px 0;
 }
 
-.subcat:hover {
-  background: #2a2a2a;
+/* === Стили для совместимости (если остаются старые элементы) === */
+.subcat {
+  display: none; /* Скрыть старые кнопки, если они случайно остались */
 }
 
 button {
@@ -207,15 +202,4 @@ input, textarea, select {
   border-radius: 12px;
   color: var(--text);
   font-size: 16px;
-}
-#items-list {
-  overflow-y: auto;
-  height: auto;
-  min-height: 300px; /* Минимальная высота */
-}
-
-/* === Скрываем старые стили при необходимости === */
-#items-list .product-card,
-.variant-list .variant-card {
-  /* Уже определены выше */
 }
