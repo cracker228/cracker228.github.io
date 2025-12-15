@@ -8,8 +8,7 @@ const path = require('path');
 // === НАСТРОЙКИ ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = parseInt(process.env.ADMIN_CHAT_ID, 10);
-// 🔥 УБРАНЫ ПРОБЕЛЫ:
-const RAILWAY_URL = 'https://cracker228githubio-site.up.railway.app';
+const RAILWAY_URL = 'https://cracker228githubio-site.up.railway.app'; // ← БЕЗ ПРОБЕЛОВ
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
@@ -122,8 +121,7 @@ bot.start(async (ctx) => {
     await ctx.reply('Добро пожаловать!', {
       reply_markup: {
         inline_keyboard: [[
-          // 🔥 УБРАНЫ ПРОБЕЛЫ:
-          { text: '🛍️ Открыть магазин', web_app: { url: 'https://cracker228.github.io' } }
+          { text: '🛍️ Открыть магазин', web_app: { url: 'https://cracker228.github.io' } } // ← БЕЗ ПРОБЕЛОВ
         ]]
       }
     });
@@ -155,7 +153,7 @@ bot.hears('⬅️ Назад', (ctx) => {
   ctx.reply('Главное меню.', Markup.removeKeyboard());
 });
 
-// === УПРАВЛЕНИЕ РОЛЯМИ (только суперадмин) ===
+// === УПРАВЛЕНИЕ РОЛЯМИ ===
 bot.hears('👥 Управление ролями', (ctx) => {
   if (!hasSuperAdminAccess(ctx.from.id)) return;
   ctx.reply('Выберите:', Markup.keyboard([
@@ -171,9 +169,6 @@ bot.hears('✏️ Переименовать каталог', (ctx) => {
   userState[ctx.from.id] = { step: 'RENAME_CATALOG_SELECT' };
   ctx.reply('Каталог (1–4):');
 });
-
-// === ОСТАЛЬНАЯ ЛОГИКА (Добавление, редактирование, удаление) ===
-// ... (оставьте вашу текущую логику без изменений)
 
 // === ОБРАБОТКА ТЕКСТА ===
 bot.on('text', async (ctx) => {
@@ -205,7 +200,37 @@ bot.on('text', async (ctx) => {
     return;
   }
 
-  // ... (ваша остальная логика: RENAME, ADD, EDIT, DELETE — без изменений)
+  // --- ПЕРЕИМЕНОВАНИЕ КАТАЛОГА ---
+  if (state?.step === 'RENAME_CATALOG_SELECT') {
+    const cat = parseInt(text);
+    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
+    const filePath = path.join(CATALOGS_DIR, `catalog${cat}.json`);
+    if (!fs.existsSync(filePath)) return ctx.reply('Каталог пуст.');
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    userState[userId] = { step: 'RENAME_CATALOG_INPUT', catalog: cat };
+    ctx.reply(`Текущее название: ${data.name}\nВведите новое:`);
+    return;
+  }
+
+  if (state?.step === 'RENAME_CATALOG_INPUT') {
+    const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
+    try {
+      let data = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf8')) : { items: [] };
+      data.name = text;
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      delete userState[userId]; // ← КЛЮЧЕВОЙ МОМЕНТ!
+      ctx.reply('✅ Каталог переименован!', Markup.removeKeyboard());
+    } catch (e) {
+      console.error('Ошибка записи catalog.json:', e);
+      ctx.reply('❌ Не удалось переименовать. Проверьте файл.');
+    }
+    return;
+  }
+
+  // === Здесь должна быть ВАША логика ADD/EDIT/DELETE ===
+  // (если у вас есть — вставьте её сюда)
+  // Если нет — функция "Переименовать каталог" уже работает.
+
 });
 
 // === ОБРАБОТКА ФОТО ===
@@ -219,15 +244,14 @@ bot.on('photo', async (ctx) => {
     const file = await ctx.telegram.getFile(photo.file_id);
     const fileName = `${Date.now()}.jpg`;
     const filePath = path.join(IMAGES_DIR, fileName);
-    // 🔥 УБРАНЫ ПРОБЕЛЫ:
-    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`; // ← БЕЗ ПРОБЕЛОВ
     const response = await fetch(fileUrl);
     const arrayBuffer = await response.arrayBuffer();
     fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
 
     const imageUrl = `${RAILWAY_URL}/images/${fileName}`;
-
-    // ... (сохранение в catalogX.json — без изменений)
+    // Здесь можно добавить логику сохранения в JSON
+    ctx.reply('✅ Фото получено!');
   } catch (e) {
     console.error('Ошибка фото:', e);
     ctx.reply('❌ Ошибка загрузки фото.');
