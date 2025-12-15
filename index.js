@@ -500,6 +500,35 @@ bot.on('photo', async (ctx) => {
     await ctx.reply('❌ Ошибка загрузки фото.');
   }
 });
+// В меню /admin (для superadmin)
+kb.push(['✏️ Переименовать каталог']);
+
+// Обработчик
+bot.hears('✏️ Переименовать каталог', (ctx) => {
+  if (!hasSuperAdminAccess(ctx.from.id)) return;
+  userState[ctx.from.id] = { step: 'RENAME_CATALOG_SELECT' };
+  ctx.reply('Выберите каталог (1–4):');
+});
+
+// В bot.on('text', ...)
+if (state?.step === 'RENAME_CATALOG_SELECT') {
+  const cat = parseInt(text);
+  if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
+  const filePath = path.join(CATALOGS_DIR, `catalog${cat}.json`);
+  if (!fs.existsSync(filePath)) return ctx.reply('Каталог пуст.');
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  userState[ctx.from.id] = { step: 'RENAME_CATALOG_INPUT', catalog: cat };
+  ctx.reply(`Текущее название: ${data.name}\nВведите новое:`);
+}
+
+if (state?.step === 'RENAME_CATALOG_INPUT') {
+  const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
+  let data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  data.name = text;
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  delete userState[ctx.from.id];
+  ctx.reply('✅ Каталог переименован!', Markup.removeKeyboard());
+}
 
 // === ЗАПУСК ===
 const PORT = process.env.PORT || 5000;
