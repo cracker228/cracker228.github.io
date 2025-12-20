@@ -1,4 +1,4 @@
-const Telegraf = require('telegraf');
+const { Telegraf } = require('telegraf');
 const Markup = require('telegraf/markup');
 const { Telegraf: TelegrafCore } = Telegraf;
 const fs = require('fs');
