@@ -1,26 +1,31 @@
-const { Telegraf } = require('telegraf');
-const Markup = require('telegraf/markup');
+require('dotenv').config();
+const { Telegraf, Markup } = require('telegraf');
+const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+// === НАСТРОЙКИ ===
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_CHAT_ID = parseInt(process.env.ADMIN_CHAT_ID, 10);
+const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
-const CATALOGS_DIR = path.join(__dirname, 'catalogs');
+// === EXPRESS ===
+app.use(cors());
+app.use(express.json());
+app.use('/api', express.static('api'));
+const CATALOGS_DIR = path.join(__dirname, 'api');
+const ROLES_FILE = path.join(__dirname, 'roles.json');
 if (!fs.existsSync(CATALOGS_DIR)) fs.mkdirSync(CATALOGS_DIR);
 
-const ROLES_FILE = path.join(__dirname, 'roles.json');
-if (!fs.existsSync(ROLES_FILE)) {
-  const roles = {};
-  const adminId = process.env.ADMIN_CHAT_ID;
-  if (adminId) {
-    roles[adminId] = 'superadmin';
-  }
-  fs.writeFileSync(ROLES_FILE, JSON.stringify(roles, null, 2));
-  console.log(`✅ Создан roles.json с superadmin: ${adminId}`);
-}
-
+// === УПРАВЛЕНИЕ РОЛЯМИ ===
 function loadRoles() {
+  if (!fs.existsSync(ROLES_FILE)) {
+    const roles = {};
+    roles[ADMIN_CHAT_ID] = 'superadmin';
+    fs.writeFileSync(ROLES_FILE, JSON.stringify(roles, null, 2));
+  }
   return JSON.parse(fs.readFileSync(ROLES_FILE, 'utf8'));
 }
 
@@ -35,97 +40,86 @@ function getUserRole(userId) {
 
 function hasAdminAccess(userId) {
   const role = getUserRole(userId);
-  return role === 'admin' || role === 'superadmin';
+  return role === 'superadmin' || role === 'admin';
 }
 
 function hasSuperAdminAccess(userId) {
   return getUserRole(userId) === 'superadmin';
 }
 
-// === /start ===
-bot.start((ctx) => {
-  ctx.reply(`Привет! Это магазин.\n\nОткройте Mini App через кнопку ниже:`, {
-    reply_markup: {
-      inline_keyboard: [[
-        { text: '🛒 Открыть магазин', web_app: { url: 'https://cracker228.github.io/' } }
-      ]]
-    }
-  });
-});
-
-// === /order ===
-bot.command('order', (ctx) => {
-  ctx.reply('Заказы отправляются только через Mini App.');
-});
-
-bot.on('text', (ctx) => {
-  if (ctx.message.text === '/order') {
-    ctx.reply('Заказы отправляются только через Mini App.');
-  }
-});
-
-// === ОТПРАВКА ЗАКАЗА ЧЕРЕЗ WEBHOOK ===
-const express = require('express');
-const app = express();
-app.use(express.json());
-
+// === ЭНДПОИНТЫ ===
 app.post('/order', async (req, res) => {
   try {
     const { message } = req.body;
-    if (!message) return res.status(400).send('Сообщение отсутствует');
-    
+    if (!message) return res.status(400).json({ error: 'Поле message обязательно' });
     const roles = loadRoles();
-    const adminIds = Object.entries(roles)
-      .filter(([_, role]) => role === 'admin' || role === 'superadmin')
-      .map(([id]) => id);
-    
-    if (adminIds.length === 0) return res.status(500).send('Нет админов');
-    
-    for (const adminId of adminIds) {
-      try {
-        await bot.telegram.sendMessage(adminId, message);
-      } catch (e) {
-        console.error('Не удалось отправить заказ админу', adminId, e.message);
+    const adminIds = Object.keys(roles).filter(id => roles[id] === 'superadmin' || roles[id] === 'admin');
+    await bot.telegram.sendMessage(ADMIN_CHAT_ID, `📦 НОВЫЙ ЗАКАЗ:\n${message}`);
+    for (const id of adminIds) {
+      if (id != ADMIN_CHAT_ID) {
+        await bot.telegram.sendMessage(id, `📦 НОВЫЙ ЗАКАЗ:\n${message}`);
       }
     }
-    res.status(200).send('OK');
+    res.json({ success: true });
   } catch (e) {
-    console.error('Ошибка /order:', e);
-    res.status(500).send('Ошибка');
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка отправки' });
   }
 });
 
-// === ПРОКСИ /tg-image/:fileId ===
+app.get('/', (req, res) => {
+  res.json({ status: 'Bot is running' });
+});
+
+// === PROXY ДЛЯ КАРТИНОК TELEGRAM ===
 app.get('/tg-image/:fileId', async (req, res) => {
   try {
     const { fileId } = req.params;
     if (!fileId || fileId.length < 10) return res.status(400).send('Invalid file_id');
-    
     const fileLink = await bot.telegram.getFileLink(fileId);
-    const imageUrl = fileLink.href;
-    
-    res.redirect(imageUrl);
+    res.redirect(fileLink.href);
   } catch (e) {
     console.error('Ошибка /tg-image:', e.message);
     res.status(500).send('Не удалось получить изображение');
   }
 });
 
-// === СЛУЖЕБНЫЕ ЭНДПОИНТЫ КАТАЛОГОВ ===
-app.use('/api', express.static(CATALOGS_DIR));
-
-// === ЗАПУСК EXPRESS ===
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🖥️  Сервер запущен на порту ${PORT}`);
-});
-
-// === АДМИНКА ===
+// === СОСТОЯНИЕ ===
 const userState = {};
 
+// === /start ===
+bot.start(async (ctx) => {
+  const payload = ctx.startPayload;
+  if (payload?.startsWith('order_')) {
+    try {
+      const msg = decodeURIComponent(Buffer.from(payload.slice(6), 'base64').toString('utf8'));
+      await ctx.reply('✅ Заказ получен!');
+      const roles = loadRoles();
+      const adminIds = Object.keys(roles).filter(id => roles[id] === 'superadmin' || roles[id] === 'admin');
+      await bot.telegram.sendMessage(ADMIN_CHAT_ID, `📦 НОВЫЙ ЗАКАЗ:\n${msg}`);
+      for (const id of adminIds) {
+        if (id != ADMIN_CHAT_ID) {
+          await bot.telegram.sendMessage(id, `📦 НОВЫЙ ЗАКАЗ:\n${msg}`);
+        }
+      }
+    } catch (e) {
+      await ctx.reply('❌ Ошибка обработки заказа.');
+    }
+  } else {
+    await ctx.reply('Добро пожаловать!', {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '🛍️ Открыть магазин', web_app: { url: 'https://cracker228.github.io' } }
+        ]]
+      }
+    });
+  }
+});
+
+// === /admin ===
 bot.command('admin', (ctx) => {
   if (!hasAdminAccess(ctx.from.id)) {
-    return ctx.reply(`🚫 У вас нет доступа. Ваш ID: ${ctx.from.id}`);
+    return ctx.reply('🚫 У вас нет доступа к админ-панели.');
   }
   const role = getUserRole(ctx.from.id);
   const kb = [
@@ -141,15 +135,14 @@ bot.command('admin', (ctx) => {
 });
 
 bot.hears('⬅️ Назад', (ctx) => {
+  const role = getUserRole(ctx.from.id);
+  if (!role) return ctx.reply('Неизвестная команда.');
   ctx.reply('Главное меню.', Markup.removeKeyboard());
-  delete userState[ctx.from.id];
 });
 
 // === УПРАВЛЕНИЕ РОЛЯМИ ===
 bot.hears('👥 Управление ролями', (ctx) => {
-  if (!hasSuperAdminAccess(ctx.from.id)) {
-    return ctx.reply('🚫 Доступ запрещён.');
-  }
+  if (!hasSuperAdminAccess(ctx.from.id)) return;
   ctx.reply('Выберите:', Markup.keyboard([
     ['👑 Назначить админа', '🧑‍💼 Назначить курьера'],
     ['⬅️ Назад']
@@ -186,10 +179,9 @@ bot.on('text', async (ctx) => {
   const state = userState[ctx.from.id];
   const text = ctx.message.text.trim();
   const userId = ctx.from.id;
-  if (!state) return;
 
   // --- УПРАВЛЕНИЕ РОЛЯМИ ---
-  if (state.step === 'ROLE_ACTION') {
+  if (state?.step === 'ROLE_ACTION') {
     if (text === '👑 Назначить админа') {
       userState[userId] = { step: 'SET_ADMIN_ID' };
       return ctx.reply('ID пользователя:');
@@ -199,7 +191,7 @@ bot.on('text', async (ctx) => {
       return ctx.reply('ID пользователя:');
     }
   }
-  if (state.step === 'SET_ADMIN_ID' || state.step === 'SET_COURIER_ID') {
+  if (state?.step === 'SET_ADMIN_ID' || state?.step === 'SET_COURIER_ID') {
     if (!/^\d+$/.test(text)) {
       return ctx.reply('❌ ID должен быть числом.');
     }
@@ -211,7 +203,7 @@ bot.on('text', async (ctx) => {
   }
 
   // --- УДАЛЕНИЕ ---
-  if (state.step === 'DELETE_TYPE') {
+  if (state?.step === 'DELETE_TYPE') {
     if (text === '📦 Товар') {
       userState[userId] = { step: 'DELETE_ITEM_CATALOG' };
       return ctx.reply('Каталог (1–4):');
@@ -221,39 +213,45 @@ bot.on('text', async (ctx) => {
     }
   }
 
-  if (state.step === 'DELETE_ITEM_CATALOG') {
+  if (state?.step === 'DELETE_ITEM_CATALOG') {
     const cat = parseInt(text);
-    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ Укажите каталог 1–4');
+    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
     const filePath = path.join(CATALOGS_DIR, `catalog${cat}.json`);
-    if (!fs.existsSync(filePath)) return ctx.reply('Каталог не существует.');
+    if (!fs.existsSync(filePath)) return ctx.reply('Каталог пуст.');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     if (!data.items?.length) return ctx.reply('Нет товаров.');
-    const kb = data.items.map(item => [`🗑 ${item.name}`]);
+    let kb = data.items.map(item => [`🗑 ${item.name}`]);
     kb.push(['⬅️ Назад']);
     userState[userId] = { step: 'DELETE_ITEM_CONFIRM', catalog: cat };
     return ctx.reply('Выберите товар:', Markup.keyboard(kb).oneTime());
   }
 
-  if (state.step === 'DELETE_ITEM_CONFIRM') {
+  if (state?.step === 'DELETE_ITEM_CONFIRM') {
     const itemName = text.replace('🗑 ', '');
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const before = data.items.length;
     data.items = data.items.filter(item => item.name !== itemName);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    delete userState[userId];
-    ctx.reply('✅ Товар удалён!', Markup.removeKeyboard());
-    return;
+    if (data.items.length < before) {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      delete userState[userId];
+      return ctx.reply('✅ Товар удалён!', Markup.removeKeyboard());
+    }
+    return ctx.reply('Не найден.');
   }
 
-  if (state.step === 'DELETE_VAR_CATALOG') {
+  if (state?.step === 'DELETE_VAR_CATALOG') {
     const cat = parseInt(text);
-    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ Укажите каталог 1–4');
+    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
     const filePath = path.join(CATALOGS_DIR, `catalog${cat}.json`);
-    if (!fs.existsSync(filePath)) return ctx.reply('Каталог не существует.');
+    if (!fs.existsSync(filePath)) return ctx.reply('Каталог пуст.');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (!data.items?.length) return ctx.reply('Нет товаров.');
     let kb = [];
-    data.items?.forEach(item => {
-      item.subcategories?.forEach(sub => kb.push([`🗑 ${item.name} – ${sub.type}`]));
+    data.items.forEach(item => {
+      if (item.subcategories?.length) {
+        item.subcategories.forEach(sub => kb.push([`🗑 ${item.name} – ${sub.type}`]));
+      }
     });
     if (kb.length === 0) return ctx.reply('Нет вариаций.');
     kb.push(['⬅️ Назад']);
@@ -261,15 +259,17 @@ bot.on('text', async (ctx) => {
     return ctx.reply('Выберите вариацию:', Markup.keyboard(kb).oneTime());
   }
 
-  if (state.step === 'DELETE_VAR_CONFIRM') {
-    const [itemName, varType] = text.replace('🗑 ', '').split(' – ');
+  if (state?.step === 'DELETE_VAR_CONFIRM') {
+    const parts = text.replace('🗑 ', '').split(' – ');
+    const itemName = parts[0];
+    const varType = parts[1];
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     let found = false;
     data.items = data.items.map(item => {
       if (item.name === itemName) {
-        const before = item.subcategories?.length || 0;
-        item.subcategories = (item.subcategories || []).filter(s => s.type !== varType);
+        const before = item.subcategories.length;
+        item.subcategories = item.subcategories.filter(sub => sub.type !== varType);
         if (item.subcategories.length < before) found = true;
       }
       return item;
@@ -279,29 +279,29 @@ bot.on('text', async (ctx) => {
       delete userState[userId];
       return ctx.reply('✅ Вариация удалена!', Markup.removeKeyboard());
     }
-    return ctx.reply('❌ Не найдена.');
+    return ctx.reply('Не найдена.');
   }
 
   // --- РЕДАКТИРОВАНИЕ ---
-  if (state.step === 'EDIT_CATALOG') {
+  if (state?.step === 'EDIT_CATALOG') {
     const cat = parseInt(text);
-    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ Укажите каталог 1–4');
+    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
     const filePath = path.join(CATALOGS_DIR, `catalog${cat}.json`);
-    if (!fs.existsSync(filePath)) return ctx.reply('Каталог не существует.');
+    if (!fs.existsSync(filePath)) return ctx.reply('Каталог пуст.');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     if (!data.items?.length) return ctx.reply('Нет товаров.');
-    const kb = data.items.map(item => [`✏️ ${item.name}`]);
+    let kb = data.items.map(item => [`✏️ ${item.name}`]);
     kb.push(['⬅️ Назад']);
     userState[userId] = { step: 'EDIT_ITEM_SELECT', catalog: cat };
     return ctx.reply('Выберите товар:', Markup.keyboard(kb).oneTime());
   }
 
-  if (state.step === 'EDIT_ITEM_SELECT') {
+  if (state?.step === 'EDIT_ITEM_SELECT') {
     const itemName = text.replace('✏️ ', '');
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const item = data.items.find(i => i.name === itemName);
-    if (!item) return ctx.reply('❌ Товар не найден.');
+    if (!item) return ctx.reply('Не найден.');
     userState[userId] = { step: 'EDIT_ITEM_ACTION', catalog: state.catalog, itemName, itemId: item.id };
     return ctx.reply('Что редактировать?', Markup.keyboard([
       ['✏️ Название', '📝 Описание'],
@@ -310,7 +310,7 @@ bot.on('text', async (ctx) => {
     ]).oneTime());
   }
 
-  if (state.step === 'EDIT_ITEM_ACTION') {
+  if (state?.step === 'EDIT_ITEM_ACTION') {
     if (text === '✏️ Название') {
       userState[userId] = { ...state, step: 'EDIT_FIELD_INPUT', field: 'name' };
       return ctx.reply('Новое название:');
@@ -327,15 +327,14 @@ bot.on('text', async (ctx) => {
       const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
       const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       const item = data.items.find(i => i.name === state.itemName);
-      if (!item?.subcategories?.length) return ctx.reply('Нет вариаций.');
-      const kb = item.subcategories.map(sub => [`✏️ ${sub.type}`]);
+      let kb = item.subcategories.map(sub => [`✏️ ${sub.type}`]);
       kb.push(['⬅️ Назад']);
       userState[userId] = { ...state, step: 'EDIT_VAR_SELECT' };
       return ctx.reply('Выберите вариацию:', Markup.keyboard(kb).oneTime());
     }
   }
 
-  if (state.step === 'EDIT_FIELD_INPUT') {
+  if (state?.step === 'EDIT_FIELD_INPUT') {
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const item = data.items.find(i => i.id === state.itemId);
@@ -348,19 +347,19 @@ bot.on('text', async (ctx) => {
     return ctx.reply('❌ Ошибка.');
   }
 
-  if (state.step === 'ADD_VAR_TYPE') {
+  if (state?.step === 'ADD_VAR_TYPE') {
     userState[userId] = { ...state, step: 'ADD_VAR_PRICE', varType: text };
     return ctx.reply(`Цена для "${text}":`);
   }
 
-  if (state.step === 'ADD_VAR_PRICE') {
+  if (state?.step === 'ADD_VAR_PRICE') {
     const price = parseFloat(text);
-    if (isNaN(price) || price <= 0) return ctx.reply('❌ Укажите корректную цену (>0)');
+    if (isNaN(price) || price <= 0) return ctx.reply('❌ Цена > 0');
     userState[userId] = { ...state, step: 'AWAITING_VAR_IMAGE', varPrice: price };
-    return ctx.reply('📸 Отправьте фото или напишите "нет":');
+    return ctx.reply('📸 Фото или "нет":');
   }
 
-  if (state.step === 'AWAITING_VAR_IMAGE' && text.toLowerCase() === 'нет') {
+  if (state?.step === 'AWAITING_VAR_IMAGE' && text.toLowerCase() === 'нет') {
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const item = data.items.find(i => i.id === state.itemId);
@@ -373,46 +372,46 @@ bot.on('text', async (ctx) => {
   }
 
   // --- ДОБАВЛЕНИЕ НОВОГО ТОВАРА ---
-  if (state.step === 'ADD_CATALOG') {
+  if (state?.step === 'ADD_CATALOG') {
     const cat = parseInt(text);
-    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ Укажите каталог 1–4');
+    if (isNaN(cat) || cat < 1 || cat > 4) return ctx.reply('❌ 1–4');
     userState[userId] = { step: 'ADD_NAME', catalog: cat };
-    return ctx.reply('Название товара:');
+    return ctx.reply('Название:');
   }
 
-  if (state.step === 'ADD_NAME') {
+  if (state?.step === 'ADD_NAME') {
     userState[userId] = { ...state, step: 'ADD_DESC', name: text };
     return ctx.reply('Описание:');
   }
 
-  if (state.step === 'ADD_DESC') {
+  if (state?.step === 'ADD_DESC') {
     userState[userId] = { ...state, step: 'ADD_TYPE', description: text };
-    return ctx.reply('Название первой вариации (тип):');
+    return ctx.reply('Вариация (тип):');
   }
 
-  if (state.step === 'ADD_TYPE') {
+  if (state?.step === 'ADD_TYPE') {
     userState[userId] = { ...state, step: 'ADD_PRICE', currentType: text };
     return ctx.reply(`Цена для "${text}":`);
   }
 
-  if (state.step === 'ADD_PRICE') {
+  if (state?.step === 'ADD_PRICE') {
     const price = parseFloat(text);
-    if (isNaN(price) || price <= 0) return ctx.reply('❌ Укажите корректную цену (>0)');
+    if (isNaN(price) || price <= 0) return ctx.reply('❌ Цена > 0');
     userState[userId] = { ...state, step: 'AWAITING_IMAGE', currentPrice: price };
-    return ctx.reply('📸 Отправьте фото или напишите "нет":');
+    return ctx.reply('📸 Фото или "нет":');
   }
 
-  if (state.step === 'AWAITING_IMAGE' && text.toLowerCase() === 'нет') {
+  if (state?.step === 'AWAITING_IMAGE' && text.toLowerCase() === 'нет') {
     const variants = state.variants || [];
     variants.push({ type: state.currentType, price: state.currentPrice, image: null });
     userState[userId] = { ...state, variants, step: 'ADD_MORE' };
-    return ctx.reply('Добавить ещё вариацию?', Markup.keyboard([['✅ Да', '❌ Нет']]).oneTime());
+    return ctx.reply('Ещё?', Markup.keyboard([['✅ Да', '❌ Нет']]).oneTime());
   }
 
-  if (state.step === 'ADD_MORE') {
+  if (state?.step === 'ADD_MORE') {
     if (text === '✅ Да') {
       userState[userId] = { ...state, step: 'ADD_TYPE' };
-      return ctx.reply('Название следующей вариации:');
+      return ctx.reply('Вариация (тип):');
     } else if (text === '❌ Нет') {
       const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
       let data = { name: `Каталог ${state.catalog}`, items: [] };
@@ -432,38 +431,40 @@ bot.on('text', async (ctx) => {
 
 // === ОБРАБОТКА ФОТО ===
 bot.on('photo', async (ctx) => {
-  const userId = ctx.from.id;
-  const state = userState[userId];
-  if (!state || !hasAdminAccess(userId)) return;
+  if (!hasAdminAccess(ctx.from.id)) return;
+  const state = userState[ctx.from.id];
+  if (!state || !state.step?.startsWith('AWAITING')) return;
 
-  const photo = ctx.message.photo.at(-1);
-  const fileId = photo.file_id;
+  try {
+    const photo = ctx.message.photo.at(-1);
+    const fileId = photo.file_id;
 
-  // --- Для новой вариации при редактировании ---
-  if (state.step === 'AWAITING_VAR_IMAGE') {
-    const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    const item = data.items.find(i => i.id === state.itemId);
-    if (item) {
-      item.subcategories.push({ type: state.varType, price: state.varPrice, image: fileId });
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    if (state.step === 'AWAITING_VAR_IMAGE') {
+      const catalogFile = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
+      const data = JSON.parse(fs.readFileSync(catalogFile, 'utf8'));
+      const item = data.items.find(i => i.id === state.itemId);
+      if (item) {
+        item.subcategories.push({ type: state.varType, price: state.varPrice, image: fileId });
+        fs.writeFileSync(catalogFile, JSON.stringify(data, null, 2));
+      }
+      delete userState[ctx.from.id];
+      return ctx.reply('✅ Вариация с фото добавлена!', Markup.removeKeyboard());
+    } else {
+      const variants = state.variants || [];
+      variants.push({ type: state.currentType, price: state.currentPrice, image: fileId });
+      userState[ctx.from.id] = { ...state, variants, step: 'ADD_MORE' };
+      return ctx.reply('Ещё?', Markup.keyboard([['✅ Да', '❌ Нет']]).oneTime());
     }
-    delete userState[userId];
-    return ctx.reply('✅ Вариация с фото добавлена!', Markup.removeKeyboard());
-  }
-
-  // --- Для новой вариации при создании товара ---
-  if (state.step === 'AWAITING_IMAGE') {
-    const variants = state.variants || [];
-    variants.push({ type: state.currentType, price: state.currentPrice, image: fileId });
-    userState[userId] = { ...state, variants, step: 'ADD_MORE' };
-    return ctx.reply('Добавить ещё вариацию?', Markup.keyboard([['✅ Да', '❌ Нет']]).oneTime());
+  } catch (e) {
+    console.error('Ошибка фото:', e);
+    await ctx.reply('❌ Ошибка загрузки фото.');
   }
 });
 
-// === ЗАПУСК БОТА ===
+// === ЗАПУСК ===
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Сервер запущен на порту ${PORT}`);
+});
 bot.launch();
-console.log('🤖 Бот запущен.');
-
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+console.log('Бот запущен');
