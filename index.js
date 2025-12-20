@@ -1,6 +1,5 @@
 const { Telegraf } = require('telegraf');
 const Markup = require('telegraf/markup');
-const { Telegraf: TelegrafCore } = Telegraf;
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -12,7 +11,13 @@ if (!fs.existsSync(CATALOGS_DIR)) fs.mkdirSync(CATALOGS_DIR);
 
 const ROLES_FILE = path.join(__dirname, 'roles.json');
 if (!fs.existsSync(ROLES_FILE)) {
-  fs.writeFileSync(ROLES_FILE, JSON.stringify({}));
+  const roles = {};
+  const adminId = process.env.ADMIN_CHAT_ID;
+  if (adminId) {
+    roles[adminId] = 'superadmin';
+  }
+  fs.writeFileSync(ROLES_FILE, JSON.stringify(roles, null, 2));
+  console.log(`✅ Создан roles.json с superadmin: ${adminId}`);
 }
 
 function loadRoles() {
@@ -99,7 +104,6 @@ app.get('/tg-image/:fileId', async (req, res) => {
     const fileLink = await bot.telegram.getFileLink(fileId);
     const imageUrl = fileLink.href;
     
-    // Перенаправляем на прямую ссылку Telegram
     res.redirect(imageUrl);
   } catch (e) {
     console.error('Ошибка /tg-image:', e.message);
@@ -113,7 +117,7 @@ app.use('/api', express.static(CATALOGS_DIR));
 // === ЗАПУСК EXPRESS ===
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`🖥️  Сервер запущен на порту ${PORT}`);
 });
 
 // === АДМИНКА ===
@@ -121,7 +125,7 @@ const userState = {};
 
 bot.command('admin', (ctx) => {
   if (!hasAdminAccess(ctx.from.id)) {
-    return ctx.reply('🚫 У вас нет доступа к админ-панели.');
+    return ctx.reply(`🚫 У вас нет доступа. Ваш ID: ${ctx.from.id}`);
   }
   const role = getUserRole(ctx.from.id);
   const kb = [
@@ -137,14 +141,15 @@ bot.command('admin', (ctx) => {
 });
 
 bot.hears('⬅️ Назад', (ctx) => {
-  const role = getUserRole(ctx.from.id);
-  if (!role) return ctx.reply('Неизвестная команда.');
   ctx.reply('Главное меню.', Markup.removeKeyboard());
+  delete userState[ctx.from.id];
 });
 
 // === УПРАВЛЕНИЕ РОЛЯМИ ===
 bot.hears('👥 Управление ролями', (ctx) => {
-  if (!hasSuperAdminAccess(ctx.from.id)) return;
+  if (!hasSuperAdminAccess(ctx.from.id)) {
+    return ctx.reply('🚫 Доступ запрещён.');
+  }
   ctx.reply('Выберите:', Markup.keyboard([
     ['👑 Назначить админа', '🧑‍💼 Назначить курьера'],
     ['⬅️ Назад']
@@ -233,7 +238,6 @@ bot.on('text', async (ctx) => {
     const itemName = text.replace('🗑 ', '');
     const filePath = path.join(CATALOGS_DIR, `catalog${state.catalog}.json`);
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    const before = data.items.length;
     data.items = data.items.filter(item => item.name !== itemName);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
     delete userState[userId];
@@ -459,7 +463,7 @@ bot.on('photo', async (ctx) => {
 
 // === ЗАПУСК БОТА ===
 bot.launch();
-console.log('Бот запущен.');
+console.log('🤖 Бот запущен.');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
