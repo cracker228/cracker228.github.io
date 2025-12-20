@@ -7,15 +7,13 @@ if (typeof window.Telegram === 'undefined') {
   `;
   throw new Error('Not running in Telegram Web App');
 }
-
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
-
-// === URL ВАШЕГО RAILWAY-СЕРВЕРА (ИСПРАВЛЕНО: УБРАНЫ ПРОБЕЛЫ!) ===
-const API_BASE_URL = 'https://cracker228-github-io.onrender.com'; // ← ТУТ БЫЛО 2 ПРОБЕЛА!
+// === URL ВАШЕГО RAILWAY-СЕРВЕРА ===
+const API_BASE_URL = 'https://cracker228-github-io.onrender.com';
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 function renderNavbar(active) {
@@ -33,7 +31,6 @@ function navigate(page, catalogId = null) {
   renderNavbar(page);
   const content = document.getElementById('content');
   if (!content) return;
-
   switch (page) {
     case 'catalog':
       renderCatalogLine(content);
@@ -81,19 +78,19 @@ async function renderCatalogItems(container, catalogId) {
     const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json?_=${Date.now()}`);
     if (!res.ok) throw new Error('404');
     const data = await res.json();
-
     container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
     const itemsDiv = container.querySelector('#items-list');
-
     data.items.forEach(item => {
+      const firstSub = item.subcategories?.[0];
+      const imageFileId = firstSub?.image;
+      const imageUrl = imageFileId
+        ? `${API_BASE_URL}/tg-image/${imageFileId.trim()}`
+        : 'https://via.placeholder.com/160?text=Нет+фото';
+
       const card = document.createElement('div');
       card.className = 'product-card';
-      const imgTag = item.image
-        ? `<img src="${item.image.trim()}" alt="${item.name}">` // ← trim() на случай пробелов
-        : `<div style="height:160px; background:#333; display:flex;align-items:center;justify-content:center;color:#555;">Нет фото</div>`;
-      
       card.innerHTML = `
-        ${imgTag}
+        <img src="${imageUrl}" alt="${item.name}" style="width:100%; height:160px; object-fit:cover; border-radius:8px;">
         <div class="product-info">
           <h3>${item.name}</h3>
           <p>${item.description}</p>
@@ -110,22 +107,21 @@ async function renderCatalogItems(container, catalogId) {
 // === ПОКАЗАТЬ ВАРИАЦИИ С ИЗОБРАЖЕНИЯМИ ===
 async function showVariants(item, catalogId) {
   try {
-    // 🔥 ИСПРАВЛЕНО: было ${i}, стало ${catalogId}
     const res = await fetch(`${API_BASE_URL}/api/catalog${catalogId}.json?_=${Date.now()}`);
     const data = await res.json();
     const targetItem = data.items.find(it => it.id === item.id);
-
     let html = `<h3>${item.name}</h3>`;
     if (targetItem?.subcategories?.length) {
       targetItem.subcategories.forEach(sub => {
-        // 🔥 Убраны пробелы из placeholder
-        const cleanImage = (sub.image || '').trim() || 'https://via.placeholder.com/100?text  =Нет+фото';
+        const cleanImage = sub.image
+          ? `${API_BASE_URL}/tg-image/${sub.image.trim()}`
+          : 'https://via.placeholder.com/100?text=Нет+фото';
         html += `
           <div class="variant-card">
             <img src="${cleanImage}" alt="${sub.type}">
             <div class="variant-info">
               <h4>${sub.type}</h4>
-              <div class "price">${sub.price} ₽</div>
+              <div class="price">${sub.price} ₽</div>
               <button class="add-to-cart-btn" onclick="confirmAddToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', '${sub.type.replace(/'/g, "\\'")}', ${sub.price})">
                 🛒 В корзину
               </button>
@@ -149,7 +145,7 @@ window.confirmAddToCart = (id, name, type, price) => {
     cart.push({ id, name, type, price: Number(price) });
     localStorage.setItem('cart', JSON.stringify(cart));
     alert('✅ Товар добавлен в корзину!');
-    // Не переходим в корзину — остаёмся на странице
+    // Остаёмся на текущей странице — НЕ ПЕРЕХОДИМ В КОРЗИНУ
   }
 };
 
@@ -163,24 +159,26 @@ window.placeOrder = async (total) => {
   const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
   const address = deliveryAddress.trim();
   const phone = phoneNumber.trim();
-
   if (!address || !phone) {
     alert('❗ Заполните адрес и телефон в личном кабинете!');
     navigate('profile');
     return;
   }
-
   const itemsText = cart.map(i => `- ${i.name} (${i.type}) — ${i.price} ₽`).join('\n');
   const paymentText = paymentMethod === 'cash' ? 'Наличными' : 'Переводом';
-  const message = `📦 НОВЫЙ ЗАКАЗ\n\n📞 Телефон: ${phone}\n🏠 Адрес: ${address}\n💳 Оплата: ${paymentText}\n💰 Сумма: ${total} ₽\n\nТовары:\n${itemsText}`;
-
+  const message = `📦 НОВЫЙ ЗАКАЗ
+📞 Телефон: ${phone}
+🏠 Адрес: ${address}
+💳 Оплата: ${paymentText}
+💰 Сумма: ${total} ₽
+Товары:
+${itemsText}`;
   try {
     const response = await fetch(`${API_BASE_URL}/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
     });
-
     if (response.ok) {
       alert('✅ Заказ отправлен!');
       cart = [];
@@ -240,7 +238,6 @@ function renderProfile(container) {
 window.saveProfile = () => {
   const addr = document.getElementById('delivery-address').value.trim();
   const phone = document.getElementById('phone-number').value.trim();
-
   if (!addr) {
     alert('❗ Укажите адрес доставки.');
     return;
@@ -249,7 +246,6 @@ window.saveProfile = () => {
     alert('❗ Укажите номер телефона.');
     return;
   }
-
   deliveryAddress = addr;
   phoneNumber = phone;
   localStorage.setItem('deliveryAddress', addr);
