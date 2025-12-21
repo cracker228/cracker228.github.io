@@ -437,5 +437,11 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен: ${RENDER_URL}`);
 });
-bot.launch();
-console.log('🤖 Бот запущен');
+const WEBHOOK_URL = 'https://cracker228-github-io.onrender.com';
+
+bot.telegram.setWebhook(`${WEBHOOK_URL}/bot${BOT_TOKEN}`);
+
+app.post(`/bot${BOT_TOKEN}`, (req, res) => {
+  bot.handleUpdate(req.body);
+  res.sendStatus(200);
+});
