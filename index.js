@@ -215,5 +215,12 @@ bot.on('photo', async ctx => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server: ${RENDER_URL}`));
-bot.launch();
+const WEBHOOK_URL = 'https://cracker228-github-io.onrender.com';
+
+bot.telegram.setWebhook(`${WEBHOOK_URL}/bot${BOT_TOKEN}`);
+
+app.post(`/bot${BOT_TOKEN}`, (req, res) => {
+  bot.handleUpdate(req.body);
+  res.sendStatus(200);
+});
 console.log('🤖 Bot started');
