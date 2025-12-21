@@ -6,8 +6,8 @@ require('dotenv').config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const CATALOGS_DIR = path.join(__dirname, 'catalogs');
-if (!fs.existsSync(CATALOGS_DIR)) fs.mkdirSync(CATALOGS_DIR);
+const CATALOGS_DIR = path.join(__dirname, 'api');
+app.use('/api', express.static(CATALOGS_DIR));
 
 const ROLES_FILE = path.join(__dirname, 'roles.json');
 if (!fs.existsSync(ROLES_FILE)) {
