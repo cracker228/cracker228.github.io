@@ -5,7 +5,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const WEBHOOK_URL = 'https://cracker228-github-io.onrender.com';
+const WEBHOOK_URL = 'https://cracker228-github-io.onrender.com'; // ← убраны пробелы
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
@@ -58,6 +58,7 @@ const loadCatalog = (n) => ghRead(`catalog${n}.json`);
 const saveCatalog = (n, d) => ghWrite(`catalog${n}.json`, d, 'update catalog');
 const loadRoles = () => ghRead('roles.json');
 const saveRoles = (r) => ghWrite('roles.json', r, 'update roles');
+
 // ===== API ДЛЯ MINI APP =====
 app.get('/api/catalog/:id', async (req, res) => {
   try {
@@ -73,6 +74,7 @@ app.get('/api/catalog/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to load catalog' });
   }
 });
+
 // ===== ПРОКСИ ДЛЯ TELEGRAM ФОТО =====
 app.get('/tg-image/:fileId', async (req, res) => {
   try {
@@ -83,8 +85,6 @@ app.get('/tg-image/:fileId', async (req, res) => {
     res.status(404).send('Image not found');
   }
 });
-
-
 
 /* ================= ROLES ================= */
 
@@ -110,7 +110,6 @@ bot.start(ctx => {
     ])
   );
 });
-
 
 const state = {};
 const reset = id => delete state[id];
@@ -162,12 +161,17 @@ bot.hears('✏️ Редактировать товар', async ctx => {
   ctx.reply('Каталог (1–4):');
 });
 
+bot.hears('⬅️ Назад', ctx => {
+  reset(ctx.from.id);
+  ctx.reply('↩️ Выход из админки', Markup.removeKeyboard());
+});
+
 /* ================= TEXT FLOW ================= */
 
 bot.on('text', async ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
-  const t = ctx.message.text;
+  const t = ctx.message.text.trim(); // ← обрезаем пробелы на всякий случай
 
   /* === SET ADMIN === */
   if (s.step === 'SET_ADMIN') {
@@ -200,6 +204,7 @@ bot.on('text', async ctx => {
     return ctx.reply('Фото или "нет":');
   }
   if (s.step === 'ADD_VAR_IMAGE' && t === 'нет') {
+    s.vars = s.vars || [];
     s.vars.push({
       id: Date.now().toString(),
       type: s.varName,
@@ -221,6 +226,143 @@ bot.on('text', async ctx => {
     reset(ctx.from.id);
     return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
   }
+  if (s.step === 'ADD_MORE' && t === 'да') {
+    s.step = 'ADD_VAR_NAME';
+    return ctx.reply('Вариация:');
+  }
+
+  /* === EDIT PRODUCT === */
+  if (s.step === 'EDIT_CAT') {
+    const catNum = +t;
+    if (![1,2,3,4].includes(catNum)) {
+      return ctx.reply('❌ Каталог должен быть от 1 до 4. Попробуйте снова.');
+    }
+    s.cat = catNum;
+    s.step = 'EDIT_ID';
+    try {
+      const catalog = await loadCatalog(s.cat);
+      if (!catalog.items?.length) {
+        ctx.reply('📦 В этом каталоге пока нет товаров.');
+        reset(ctx.from.id);
+        return;
+      }
+      const itemsList = catalog.items.map(item => `${item.id}: ${item.name}`).join('\n');
+      ctx.reply(`Выберите ID товара для редактирования:\n\n${itemsList}`);
+    } catch (e) {
+      ctx.reply('❌ Ошибка загрузки каталога.');
+      reset(ctx.from.id);
+    }
+  }
+
+  if (s.step === 'EDIT_ID') {
+    s.itemId = t;
+    try {
+      const catalog = await loadCatalog(s.cat);
+      const item = catalog.items.find(i => i.id === s.itemId);
+      if (!item) {
+        ctx.reply('❌ Товар не найден. Попробуйте снова.');
+        reset(ctx.from.id);
+        return;
+      }
+      s.item = item;
+      s.step = 'EDIT_FIELD';
+      ctx.reply(
+        `Редактируем: ${item.name}\n\nЧто изменить?\n\n1. Название\n2. Описание\n3. Вариации`,
+        Markup.keyboard([['1', '2', '3'], ['❌ Отмена']]).oneTime()
+      );
+    } catch (e) {
+      ctx.reply('❌ Ошибка при поиске товара.');
+      reset(ctx.from.id);
+    }
+  }
+
+  if (s.step === 'EDIT_FIELD') {
+    if (t === '❌ Отмена') {
+      reset(ctx.from.id);
+      return ctx.reply('✅ Отменено', Markup.removeKeyboard());
+    }
+    if (t === '1') {
+      s.editField = 'name';
+      ctx.reply('Введите новое название:');
+      s.step = 'EDIT_VALUE';
+    } else if (t === '2') {
+      s.editField = 'description';
+      ctx.reply('Введите новое описание:');
+      s.step = 'EDIT_VALUE';
+    } else if (t === '3') {
+      ctx.reply('🛠️ Редактирование вариаций пока не реализовано.', Markup.removeKeyboard());
+      reset(ctx.from.id);
+    } else {
+      ctx.reply('Выберите 1, 2 или 3.');
+    }
+  }
+
+  if (s.step === 'EDIT_VALUE') {
+    if (s.editField === 'name') {
+      s.item.name = t;
+    } else if (s.editField === 'description') {
+      s.item.description = t;
+    }
+
+    try {
+      const catalog = await loadCatalog(s.cat);
+      const index = catalog.items.findIndex(i => i.id === s.itemId);
+      if (index !== -1) {
+        catalog.items[index] = s.item;
+        await saveCatalog(s.cat, catalog);
+        ctx.reply('✅ Товар обновлён', Markup.removeKeyboard());
+      } else {
+        ctx.reply('❌ Товар исчез при сохранении.');
+      }
+    } catch (e) {
+      ctx.reply('❌ Ошибка сохранения.');
+    }
+    reset(ctx.from.id);
+  }
+
+  /* === DELETE PRODUCT === */
+  if (s.step === 'DEL_CAT') {
+    const catNum = +t;
+    if (![1,2,3,4].includes(catNum)) {
+      return ctx.reply('❌ Каталог должен быть от 1 до 4.');
+    }
+    s.cat = catNum;
+    s.step = 'DEL_ID';
+    try {
+      const catalog = await loadCatalog(s.cat);
+      if (!catalog.items?.length) {
+        ctx.reply('📦 В этом каталоге нет товаров.');
+        reset(ctx.from.id);
+        return;
+      }
+      const itemsList = catalog.items.map(item => `${item.id}: ${item.name}`).join('\n');
+      ctx.reply(`Выберите ID товара для удаления:\n\n${itemsList}`);
+    } catch (e) {
+      ctx.reply('❌ Ошибка загрузки каталога.');
+      reset(ctx.from.id);
+    }
+  }
+
+  if (s.step === 'DEL_ID') {
+    s.itemId = t;
+    try {
+      const catalog = await loadCatalog(s.cat);
+      const index = catalog.items.findIndex(i => i.id === s.itemId);
+      if (index === -1) {
+        ctx.reply('❌ Товар не найден.');
+        reset(ctx.from.id);
+        return;
+      }
+
+      catalog.items.splice(index, 1);
+      await saveCatalog(s.cat, catalog);
+      ctx.reply('✅ Товар удалён', Markup.removeKeyboard());
+      reset(ctx.from.id);
+    } catch (e) {
+      ctx.reply('❌ Ошибка при удалении.');
+      reset(ctx.from.id);
+    }
+  }
 });
 
 /* ================= PHOTO ================= */
@@ -231,6 +373,7 @@ bot.on('photo', ctx => {
   const fileId = ctx.message.photo.at(-1).file_id;
 
   if (s.step === 'ADD_VAR_IMAGE') {
+    s.vars = s.vars || [];
     s.vars.push({
       id: Date.now().toString(),
       type: s.varName,
@@ -248,6 +391,11 @@ bot.telegram.setWebhook(`${WEBHOOK_URL}/bot${BOT_TOKEN}`);
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {
   bot.handleUpdate(req.body);
   res.sendStatus(200);
+});
+
+// Обработка ошибок бота
+bot.catch(err => {
+  console.error('Unhandled bot error:', err);
 });
 
 const PORT = process.env.PORT || 3000;
