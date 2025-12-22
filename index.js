@@ -73,13 +73,17 @@ async function isSuper(id) {
 /* ================= BOT ================= */
 
 bot.start(ctx => {
-  ctx.reply('Магазин:', {
-    inline_keyboard: [[{
-      text: '🛍 Открыть',
-      web_app: { url: 'https://cracker228.github.io/' }
-    }]]
-  });
+  ctx.reply(
+    'Магазин:',
+    Markup.inlineKeyboard([
+      Markup.button.webApp(
+        '🛍 Открыть магазин',
+        'https://cracker228.github.io/'
+      )
+    ])
+  );
 });
+
 
 const state = {};
 const reset = id => delete state[id];
