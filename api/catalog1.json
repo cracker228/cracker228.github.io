@@ -1,4 +1,18 @@
 {
   "name": "Каталог 1",
-  "items": []
+  "items": [
+    {
+      "id": "1766400929191",
+      "name": "ad",
+      "description": "ad",
+      "subcategories": [
+        {
+          "id": "1766400927617",
+          "type": "q",
+          "price": 11,
+          "image": "AgACAgIAAxkBAAIFN2lJI5_6XqcIFworuiKWn_TVxew7AAIbDmsbgJ5JShNOXLvKfqRgAQADAgADeAADNgQ"
+        }
+      ]
+    }
+  ]
 }
