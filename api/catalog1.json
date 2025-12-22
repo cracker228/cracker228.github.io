@@ -13,6 +13,19 @@
           "image": "AgACAgIAAxkBAAIFN2lJI5_6XqcIFworuiKWn_TVxew7AAIbDmsbgJ5JShNOXLvKfqRgAQADAgADeAADNgQ"
         }
       ]
+    },
+    {
+      "id": "1766405299510",
+      "name": "Bruhhhh",
+      "description": "Grok",
+      "subcategories": [
+        {
+          "id": "1766405296612",
+          "type": "Blad",
+          "price": 100,
+          "image": "AgACAgIAAxkBAAIFWmlJNLBidVNYhFtmIgrHWvbhhbXiAAL_DmsbgJ5JSmjhJrZ9bxkKAQADAgADeQADNgQ"
+        }
+      ]
     }
   ]
 }
