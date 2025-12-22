@@ -5,7 +5,6 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID);
 const WEBHOOK_URL = 'https://cracker228-github-io.onrender.com';
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -13,332 +12,189 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ===================== GITHUB ===================== */
+/* ================= GITHUB ================= */
 
 const GH = {
   token: process.env.GITHUB_TOKEN,
   owner: process.env.GITHUB_OWNER,
   repo: process.env.GITHUB_REPO,
-  branch: process.env.GITHUB_BRANCH || 'main'
+  branch: 'main'
 };
 
 const GH_API = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/api`;
 
 async function ghRead(file) {
-  const res = await fetch(`${GH_API}/${file}`, {
+  const r = await fetch(`${GH_API}/${file}`, {
     headers: { Authorization: `token ${GH.token}` }
   });
-  if (!res.ok) throw new Error('GitHub read error');
-  const data = await res.json();
-  return JSON.parse(Buffer.from(data.content, 'base64').toString());
+  if (!r.ok) throw new Error('read error');
+  const j = await r.json();
+  return JSON.parse(Buffer.from(j.content, 'base64').toString());
 }
 
-async function ghWrite(file, json, message) {
+async function ghWrite(file, data, msg) {
   let sha;
-  const existing = await fetch(`${GH_API}/${file}`, {
+  const r = await fetch(`${GH_API}/${file}`, {
     headers: { Authorization: `token ${GH.token}` }
   });
-  if (existing.ok) sha = (await existing.json()).sha;
+  if (r.ok) sha = (await r.json()).sha;
 
-  const res = await fetch(`${GH_API}/${file}`, {
+  await fetch(`${GH_API}/${file}`, {
     method: 'PUT',
     headers: {
       Authorization: `token ${GH.token}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      message,
-      content: Buffer.from(JSON.stringify(json, null, 2)).toString('base64'),
+      message: msg,
+      content: Buffer.from(JSON.stringify(data, null, 2)).toString('base64'),
       sha,
       branch: GH.branch
     })
   });
-
-  if (!res.ok) throw new Error('GitHub write error');
 }
 
 const loadCatalog = (n) => ghRead(`catalog${n}.json`);
 const saveCatalog = (n, d) => ghWrite(`catalog${n}.json`, d, 'update catalog');
-
-const loadRoles = async () => {
-  try {
-    return await ghRead('roles.json');
-  } catch {
-    return { [ADMIN_CHAT_ID]: 'superadmin' };
-  }
-};
+const loadRoles = () => ghRead('roles.json');
 const saveRoles = (r) => ghWrite('roles.json', r, 'update roles');
 
-/* ===================== ROLES ===================== */
+/* ================= ROLES ================= */
 
-async function getUserRole(id) {
-  const roles = await loadRoles();
-  return roles[String(id)] || null;
+async function isAdmin(id) {
+  const r = await loadRoles();
+  return ['admin','superadmin'].includes(r[id]);
 }
-async function hasAdmin(id) {
-  const r = await getUserRole(id);
-  return r === 'admin' || r === 'superadmin';
-}
-async function hasSuperAdmin(id) {
-  return (await getUserRole(id)) === 'superadmin';
+async function isSuper(id) {
+  const r = await loadRoles();
+  return r[id] === 'superadmin';
 }
 
-/* ===================== API ===================== */
-
-app.post('/order', async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).send('No message');
-  const roles = await loadRoles();
-  for (const id in roles) {
-    if (roles[id] !== 'courier') {
-      await bot.telegram.sendMessage(id, message);
-    }
-  }
-  res.send('OK');
-});
-
-app.get('/tg-image/:fileId', async (req, res) => {
-  try {
-    const link = await bot.telegram.getFileLink(req.params.fileId);
-    res.redirect(link.href);
-  } catch {
-    res.status(404).send('Not found');
-  }
-});
-
-/* ===================== BOT ===================== */
+/* ================= BOT ================= */
 
 bot.start(ctx => {
-  ctx.reply('Добро пожаловать!', {
-    reply_markup: {
-      inline_keyboard: [[
-        { text: '🛍️ Открыть магазин', web_app: { url: 'https://cracker228.github.io/' } }
-      ]]
-    }
+  ctx.reply('Магазин:', {
+    inline_keyboard: [[{
+      text: '🛍 Открыть',
+      web_app: { url: 'https://cracker228.github.io/' }
+    }]]
   });
 });
 
 const state = {};
-const reset = (id) => delete state[id];
+const reset = id => delete state[id];
 
-/* ===================== ADMIN PANEL ===================== */
+/* ================= ADMIN MENU ================= */
 
 bot.command('admin', async ctx => {
-  if (!(await hasAdmin(ctx.from.id))) return ctx.reply('🚫 Нет доступа');
+  if (!(await isAdmin(ctx.from.id))) return ctx.reply('🚫 Нет доступа');
 
-  const role = await getUserRole(ctx.from.id);
+  const roles = await loadRoles();
+  const role = roles[ctx.from.id];
+
   const kb = [
     ['➕ Добавить товар'],
     ['✏️ Редактировать товар'],
     ['🗑 Удалить товар']
   ];
 
-  if (role === 'superadmin') {
-    kb.push(['👥 Назначить роль']);
-  }
-
+  if (role === 'superadmin') kb.push(['👥 Назначить админа']);
   kb.push(['⬅️ Назад']);
-  reset(ctx.from.id);
 
+  reset(ctx.from.id);
   ctx.reply('🔐 Админка', Markup.keyboard(kb).resize());
 });
 
-/* ===================== ROLE MGMT ===================== */
+/* ================= HEARS ================= */
 
-bot.hears('👥 Назначить роль', async ctx => {
-  if (!(await hasSuperAdmin(ctx.from.id))) return;
-  state[ctx.from.id] = { step: 'SET_ROLE_TYPE' };
-  ctx.reply('Выберите:', Markup.keyboard([
-    ['👑 Админ', '🧑‍💼 Курьер'],
-    ['⬅️ Назад']
-  ]).oneTime());
+bot.hears('👥 Назначить админа', async ctx => {
+  if (!(await isSuper(ctx.from.id))) return;
+  state[ctx.from.id] = { step: 'SET_ADMIN' };
+  ctx.reply('ID пользователя:');
 });
 
-/* ===================== ADD / EDIT / DELETE ===================== */
-/* 
-  ⚠️ ВАЖНО:
-  - ВСЕ операции идут по item.id и sub.id
-  - НИГДЕ нет работы по name
-  - Фото ТОЛЬКО в subcategories[].image
-*/
+bot.hears('➕ Добавить товар', async ctx => {
+  if (!(await isAdmin(ctx.from.id))) return;
+  state[ctx.from.id] = { step: 'ADD_CAT', vars: [] };
+  ctx.reply('Каталог (1–4):');
+});
 
-/* ==== ТУТ РЕАЛИЗОВАНО ВСЁ ====
-   - добавление товара
-   - добавление вариаций
-   - редактирование товара (name, desc)
-   - редактирование вариации (type, price, image)
-   - удаление вариации
-   - удаление товара
+bot.hears('🗑 Удалить товар', async ctx => {
+  if (!(await isAdmin(ctx.from.id))) return;
+  state[ctx.from.id] = { step: 'DEL_CAT' };
+  ctx.reply('Каталог (1–4):');
+});
 
-   (код большой, но логически прямой)
-*/
+bot.hears('✏️ Редактировать товар', async ctx => {
+  if (!(await isAdmin(ctx.from.id))) return;
+  state[ctx.from.id] = { step: 'EDIT_CAT' };
+  ctx.reply('Каталог (1–4):');
+});
 
-/* ===================== ROLE FLOW ===================== */
+/* ================= TEXT FLOW ================= */
 
 bot.on('text', async ctx => {
   const s = state[ctx.from.id];
-  const text = ctx.message.text.trim();
   if (!s) return;
+  const t = ctx.message.text;
 
-  /* ===== ROLE ===== */
-  if (s.step === 'SET_ROLE_TYPE') {
-    if (text === '👑 Админ' || text === '🧑‍💼 Курьер') {
-      state[ctx.from.id] = {
-        step: 'SET_ROLE_ID',
-        role: text === '👑 Админ' ? 'admin' : 'courier'
-      };
-      return ctx.reply('Введите ID пользователя:');
-    }
-  }
-
-  if (s.step === 'SET_ROLE_ID') {
-    if (!/^\d+$/.test(text)) return ctx.reply('ID должен быть числом');
+  /* === SET ADMIN === */
+  if (s.step === 'SET_ADMIN') {
     const roles = await loadRoles();
-    roles[text] = s.role;
+    roles[t] = 'admin';
     await saveRoles(roles);
     reset(ctx.from.id);
-    return ctx.reply('✅ Роль назначена', Markup.removeKeyboard());
+    return ctx.reply('✅ Админ назначен', Markup.removeKeyboard());
   }
 
-  /* ===== ADD PRODUCT ===== */
-  if (text === '➕ Добавить товар') {
-    state[ctx.from.id] = { step: 'ADD_CAT' };
-    return ctx.reply('Каталог (1–4):');
-  }
-
+  /* === ADD PRODUCT === */
   if (s.step === 'ADD_CAT') {
-    const n = Number(text);
-    if (![1,2,3,4].includes(n)) return ctx.reply('1–4');
-    state[ctx.from.id] = { step: 'ADD_NAME', cat: n, vars: [] };
-    return ctx.reply('Название товара:');
+    s.cat = +t; s.step = 'ADD_NAME';
+    return ctx.reply('Название:');
   }
-
   if (s.step === 'ADD_NAME') {
-    s.name = text;
-    s.step = 'ADD_DESC';
+    s.name = t; s.step = 'ADD_DESC';
     return ctx.reply('Описание:');
   }
-
   if (s.step === 'ADD_DESC') {
-    s.desc = text;
-    s.step = 'ADD_VAR_TYPE';
-    return ctx.reply('Название вариации:');
+    s.desc = t; s.step = 'ADD_VAR_NAME';
+    return ctx.reply('Вариация:');
   }
-
-  if (s.step === 'ADD_VAR_TYPE') {
-    s.varType = text;
-    s.step = 'ADD_VAR_PRICE';
+  if (s.step === 'ADD_VAR_NAME') {
+    s.varName = t; s.step = 'ADD_VAR_PRICE';
     return ctx.reply('Цена:');
   }
-
   if (s.step === 'ADD_VAR_PRICE') {
-    const price = Number(text);
-    if (price <= 0) return ctx.reply('Цена > 0');
-    s.varPrice = price;
-    s.step = 'ADD_VAR_IMAGE';
+    s.varPrice = +t; s.step = 'ADD_VAR_IMAGE';
     return ctx.reply('Фото или "нет":');
   }
-
-  if (s.step === 'ADD_VAR_IMAGE' && text.toLowerCase() === 'нет') {
+  if (s.step === 'ADD_VAR_IMAGE' && t === 'нет') {
     s.vars.push({
       id: Date.now().toString(),
-      type: s.varType,
+      type: s.varName,
       price: s.varPrice,
       image: null
     });
-    s.step = 'ADD_MORE_VAR';
-    return ctx.reply('Добавить ещё?', Markup.keyboard([['✅ Да','❌ Нет']]).oneTime());
+    s.step = 'ADD_MORE';
+    return ctx.reply('Ещё?', Markup.keyboard([['да','нет']]).oneTime());
   }
-
-  if (s.step === 'ADD_MORE_VAR') {
-    if (text === '✅ Да') {
-      s.step = 'ADD_VAR_TYPE';
-      return ctx.reply('Название вариации:');
-    }
-    if (text === '❌ Нет') {
-      const cat = await loadCatalog(s.cat);
-      cat.items = cat.items || [];
-      cat.items.push({
-        id: Date.now().toString(),
-        name: s.name,
-        description: s.desc,
-        subcategories: s.vars
-      });
-      await saveCatalog(s.cat, cat);
-      reset(ctx.from.id);
-      return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
-    }
-  }
-
-  /* ===== EDIT PRODUCT ===== */
-  if (text === '✏️ Редактировать товар') {
-    state[ctx.from.id] = { step: 'EDIT_CAT' };
-    return ctx.reply('Каталог (1–4):');
-  }
-
-  if (s.step === 'EDIT_CAT') {
-    const cat = Number(text);
-    const data = await loadCatalog(cat);
-    const kb = data.items.map(i => [`✏️ ${i.name}`]);
-    kb.push(['⬅️ Назад']);
-    s.step = 'EDIT_SELECT';
-    s.cat = cat;
-    return ctx.reply('Выбери товар:', Markup.keyboard(kb));
-  }
-
-  if (s.step === 'EDIT_SELECT') {
-    const name = text.replace('✏️ ', '');
-    const data = await loadCatalog(s.cat);
-    const item = data.items.find(i => i.name === name);
-    s.itemId = item.id;
-    s.step = 'EDIT_MENU';
-    return ctx.reply('Что изменить?', Markup.keyboard([
-      ['✏️ Название','📝 Описание'],
-      ['🖼 Фото'],
-      ['✏️ Вариации'],
-      ['⬅️ Назад']
-    ]));
-  }
-
-  if (s.step === 'EDIT_MENU') {
-    if (text === '✏️ Название') {
-      s.step = 'EDIT_NAME';
-      return ctx.reply('Новое название:');
-    }
-    if (text === '📝 Описание') {
-      s.step = 'EDIT_DESC';
-      return ctx.reply('Новое описание:');
-    }
-    if (text === '✏️ Вариации') {
-      const data = await loadCatalog(s.cat);
-      const item = data.items.find(i => i.id === s.itemId);
-      const kb = item.subcategories.map(v => [`✏️ ${v.type}`]);
-      kb.push(['➕ Добавить вариацию','⬅️ Назад']);
-      s.step = 'EDIT_VAR_SELECT';
-      return ctx.reply('Вариации:', Markup.keyboard(kb));
-    }
-  }
-
-  if (s.step === 'EDIT_NAME') {
-    const data = await loadCatalog(s.cat);
-    data.items.find(i => i.id === s.itemId).name = text;
-    await saveCatalog(s.cat, data);
+  if (s.step === 'ADD_MORE' && t === 'нет') {
+    const c = await loadCatalog(s.cat);
+    c.items.push({
+      id: Date.now().toString(),
+      name: s.name,
+      description: s.desc,
+      subcategories: s.vars
+    });
+    await saveCatalog(s.cat, c);
     reset(ctx.from.id);
-    return ctx.reply('✅ Обновлено', Markup.removeKeyboard());
-  }
-
-  if (s.step === 'EDIT_DESC') {
-    const data = await loadCatalog(s.cat);
-    data.items.find(i => i.id === s.itemId).description = text;
-    await saveCatalog(s.cat, data);
-    reset(ctx.from.id);
-    return ctx.reply('✅ Обновлено', Markup.removeKeyboard());
+    return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
   }
 });
 
-/* ===== PHOTO HANDLER ===== */
+/* ================= PHOTO ================= */
 
-bot.on('photo', async ctx => {
+bot.on('photo', ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
   const fileId = ctx.message.photo.at(-1).file_id;
@@ -346,25 +202,22 @@ bot.on('photo', async ctx => {
   if (s.step === 'ADD_VAR_IMAGE') {
     s.vars.push({
       id: Date.now().toString(),
-      type: s.varType,
+      type: s.varName,
       price: s.varPrice,
       image: fileId
     });
-    s.step = 'ADD_MORE_VAR';
-    return ctx.reply('Добавить ещё?', Markup.keyboard([['✅ Да','❌ Нет']]).oneTime());
+    s.step = 'ADD_MORE';
+    ctx.reply('Ещё?', Markup.keyboard([['да','нет']]).oneTime());
   }
 });
 
-/* ===================== WEBHOOK ===================== */
+/* ================= WEBHOOK ================= */
 
 bot.telegram.setWebhook(`${WEBHOOK_URL}/bot${BOT_TOKEN}`);
-
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {
   bot.handleUpdate(req.body);
   res.sendStatus(200);
 });
 
-/* ===================== START ===================== */
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('🚀 Server started'));
+app.listen(PORT, () => console.log('OK'));
