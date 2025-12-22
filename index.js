@@ -73,6 +73,17 @@ app.get('/api/catalog/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to load catalog' });
   }
 });
+// ===== ПРОКСИ ДЛЯ TELEGRAM ФОТО =====
+app.get('/tg-image/:fileId', async (req, res) => {
+  try {
+    const link = await bot.telegram.getFileLink(req.params.fileId);
+    res.redirect(link.href);
+  } catch (e) {
+    console.error('TG image error', e);
+    res.status(404).send('Image not found');
+  }
+});
+
 
 
 /* ================= ROLES ================= */
