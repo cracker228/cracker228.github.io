@@ -58,6 +58,22 @@ const loadCatalog = (n) => ghRead(`catalog${n}.json`);
 const saveCatalog = (n, d) => ghWrite(`catalog${n}.json`, d, 'update catalog');
 const loadRoles = () => ghRead('roles.json');
 const saveRoles = (r) => ghWrite('roles.json', r, 'update roles');
+// ===== API ДЛЯ MINI APP =====
+app.get('/api/catalog/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (![1, 2, 3, 4].includes(id)) {
+      return res.status(400).json({ error: 'Invalid catalog id' });
+    }
+
+    const data = await loadCatalog(id);
+    res.json(data);
+  } catch (err) {
+    console.error('Catalog API error:', err);
+    res.status(500).json({ error: 'Failed to load catalog' });
+  }
+});
+
 
 /* ================= ROLES ================= */
 
