@@ -76,134 +76,245 @@ app.post('/order', async (req, res) => {
   res.send('ok');
 });
 
+// ================== ADMIN LOGIC ==================
 const adminState = {};
 
-// ===== HELPERS =====
-function reset(ctx) {
-  delete adminState[ctx.from.id];
-  ctx.reply('🔧 Админка', Markup.keyboard([
-    ['➕ Добавить товар'],
-    ['✏️ Редактировать товар'],
-    ['🗑 Удалить товар'],
-    ...(isSuper(ctx.from.id) ? [['👑 Назначить админа']] : []),
-    ['⬅️ Назад']
-  ]).resize());
-}
-
-function chooseCatalog(ctx, mode) {
-  adminState[ctx.from.id] = { mode };
-  ctx.reply('Выбери каталог:', Markup.keyboard([
-    ['1','2','3','4'],
-    ['⬅️ Назад']
-  ]).resize());
-}
-
-function chooseItem(ctx, catalog) {
-  const data = loadCatalog(catalog);
-  if (!data.items.length) {
-    ctx.reply('❌ Каталог пуст');
-    return reset(ctx);
-  }
-  adminState[ctx.from.id].catalog = catalog;
+// ---------- HELPERS ----------
+const askCatalog = (ctx, next) => {
+  adminState[ctx.from.id] = { step: next };
   ctx.reply(
-    'Выбери товар:',
-    Markup.keyboard(
-      data.items.map(i => [i.name]).concat([['⬅️ Назад']])
-    ).resize()
+    'Выберите каталог:',
+    Markup.keyboard([['1', '2'], ['3', '4'], ['⬅️ Назад']])
+      .resize()
+      .oneTime()
   );
-}
+};
 
-// ===== COMMAND =====
+const getCatalogKeyboard = (catalog) => {
+  const cat = loadCatalog(catalog);
+  const kb = cat.items.map(i => [i.name]);
+  kb.push(['⬅️ Назад']);
+  return kb;
+};
+
+// ---------- ADMIN ENTRY ----------
 bot.command('admin', ctx => {
-  if (!isAdmin(ctx.from.id)) return;
-  reset(ctx);
+  if (!isAdmin(ctx.from.id)) return ctx.reply('❌ Нет доступа');
+
+  adminState[ctx.from.id] = {};
+  ctx.reply(
+    '🔧 Админ-панель',
+    Markup.keyboard([
+      ['➕ Добавить товар'],
+      ['✏️ Редактировать товар'],
+      ['🗑 Удалить товар'],
+      ...(isSuper(ctx.from.id) ? [['👑 Назначить админа']] : []),
+      ['⬅️ Назад']
+    ]).resize()
+  );
 });
 
-// ===== BUTTONS =====
-bot.hears('➕ Добавить товар', ctx => chooseCatalog(ctx, 'add'));
-bot.hears('✏️ Редактировать товар', ctx => chooseCatalog(ctx, 'edit'));
-bot.hears('🗑 Удалить товар', ctx => chooseCatalog(ctx, 'delete'));
-bot.hears('⬅️ Назад', ctx => reset(ctx));
+// ---------- BACK ----------
+bot.hears('⬅️ Назад', ctx => {
+  delete adminState[ctx.from.id];
+  ctx.reply('Главное меню', Markup.removeKeyboard());
+});
 
-// ===== TEXT FLOW =====
+// ---------- ASSIGN ADMIN ----------
+bot.hears('👑 Назначить админа', ctx => {
+  if (!isSuper(ctx.from.id)) return;
+  adminState[ctx.from.id] = { step: 'SET_ADMIN' };
+  ctx.reply('ID пользователя:');
+});
+
+// ---------- ADD PRODUCT ----------
+bot.hears('➕ Добавить товар', ctx => askCatalog(ctx, 'ADD_CAT'));
+
+// ---------- EDIT PRODUCT ----------
+bot.hears('✏️ Редактировать товар', ctx => askCatalog(ctx, 'EDIT_CAT'));
+
+// ---------- DELETE PRODUCT ----------
+bot.hears('🗑 Удалить товар', ctx => askCatalog(ctx, 'DEL_CAT'));
+
+// ---------- TEXT HANDLER ----------
 bot.on('text', ctx => {
   const s = adminState[ctx.from.id];
   if (!s) return;
 
   const text = ctx.message.text;
 
-  // ===== SELECT CATALOG =====
-  if (['add','edit','delete'].includes(s.mode) && !s.catalog) {
+  // --- SET ADMIN ---
+  if (s.step === 'SET_ADMIN') {
+    const roles = loadRoles();
+    roles[text] = 'admin';
+    saveRoles(roles);
+    delete adminState[ctx.from.id];
+    return ctx.reply('✅ Админ назначен');
+  }
+
+  // === ADD PRODUCT FLOW ===
+  if (s.step === 'ADD_CAT') {
     s.catalog = Number(text);
-    if (s.mode === 'add') {
-      s.step = 'NAME';
-      return ctx.reply('Название товара:');
-    }
-    return chooseItem(ctx, s.catalog);
+    s.step = 'ADD_NAME';
+    s.variants = [];
+    return ctx.reply('Название товара:');
   }
 
-  // ===== ADD FLOW =====
-  if (s.mode === 'add') {
-    if (s.step === 'NAME') {
-      s.name = text;
-      s.step = 'DESC';
-      return ctx.reply('Описание:');
+  if (s.step === 'ADD_NAME') {
+    s.name = text;
+    s.step = 'ADD_DESC';
+    return ctx.reply('Описание товара:');
+  }
+
+  if (s.step === 'ADD_DESC') {
+    s.description = text;
+    s.step = 'ADD_ITEM_IMAGE';
+    return ctx.reply('📸 Фото товара:');
+  }
+
+  if (s.step === 'ADD_VAR_TYPE') {
+    s.varType = text;
+    s.step = 'ADD_VAR_PRICE';
+    return ctx.reply('Цена вариации:');
+  }
+
+  if (s.step === 'ADD_VAR_PRICE') {
+    s.varPrice = Number(text);
+    s.step = 'ADD_VAR_IMAGE';
+    return ctx.reply('📸 Фото вариации:');
+  }
+
+  if (s.step === 'ADD_MORE_VAR') {
+    if (text === '➕ Да') {
+      s.step = 'ADD_VAR_TYPE';
+      return ctx.reply('Тип вариации:');
     }
-    if (s.step === 'DESC') {
-      s.description = text;
-      s.step = 'ITEM_PHOTO';
-      return ctx.reply('📸 Фото товара:');
+    if (text === '❌ Нет') {
+      const catalog = loadCatalog(s.catalog);
+      catalog.items.push({
+        id: Date.now().toString(),
+        name: s.name,
+        description: s.description,
+        image: s.image,
+        subcategories: s.variants
+      });
+      saveCatalog(s.catalog, catalog);
+      delete adminState[ctx.from.id];
+      return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
     }
   }
 
-  // ===== EDIT =====
-  if (s.mode === 'edit' && !s.itemName) {
+  // === DELETE PRODUCT ===
+  if (s.step === 'DEL_CAT') {
+    s.catalog = Number(text);
+    s.step = 'DEL_ITEM';
+    return ctx.reply(
+      'Выберите товар:',
+      Markup.keyboard(getCatalogKeyboard(s.catalog)).oneTime()
+    );
+  }
+
+  if (s.step === 'DEL_ITEM') {
+    const catalog = loadCatalog(s.catalog);
+    catalog.items = catalog.items.filter(i => i.name !== text);
+    saveCatalog(s.catalog, catalog);
+    delete adminState[ctx.from.id];
+    return ctx.reply('🗑 Товар удалён', Markup.removeKeyboard());
+  }
+
+  // === EDIT PRODUCT ===
+  if (s.step === 'EDIT_CAT') {
+    s.catalog = Number(text);
+    s.step = 'EDIT_ITEM';
+    return ctx.reply(
+      'Выберите товар:',
+      Markup.keyboard(getCatalogKeyboard(s.catalog)).oneTime()
+    );
+  }
+
+  if (s.step === 'EDIT_ITEM') {
     s.itemName = text;
-    s.step = 'EDIT_NAME';
-    return ctx.reply('Новое название:');
+    s.step = 'EDIT_ACTION';
+    return ctx.reply(
+      'Что редактировать?',
+      Markup.keyboard([
+        ['🖼 Фото', '✏️ Название'],
+        ['📝 Описание'],
+        ['⬅️ Назад']
+      ]).oneTime()
+    );
+  }
+
+  if (s.step === 'EDIT_ACTION') {
+    if (text === '✏️ Название') {
+      s.step = 'EDIT_NAME';
+      return ctx.reply('Новое название:');
+    }
+    if (text === '📝 Описание') {
+      s.step = 'EDIT_DESC';
+      return ctx.reply('Новое описание:');
+    }
+    if (text === '🖼 Фото') {
+      s.step = 'EDIT_IMAGE';
+      return ctx.reply('📸 Новое фото:');
+    }
   }
 
   if (s.step === 'EDIT_NAME') {
-    const data = loadCatalog(s.catalog);
-    const item = data.items.find(i => i.name === s.itemName);
-    if (!item) return reset(ctx);
+    const cat = loadCatalog(s.catalog);
+    const item = cat.items.find(i => i.name === s.itemName);
     item.name = text;
-    saveCatalog(s.catalog, data);
-    ctx.reply('✅ Обновлено');
-    return reset(ctx);
+    saveCatalog(s.catalog, cat);
+    delete adminState[ctx.from.id];
+    return ctx.reply('✅ Название обновлено', Markup.removeKeyboard());
   }
 
-  // ===== DELETE =====
-  if (s.mode === 'delete' && !s.itemName) {
-    const data = loadCatalog(s.catalog);
-    data.items = data.items.filter(i => i.name !== text);
-    saveCatalog(s.catalog, data);
-    ctx.reply('🗑 Удалено');
-    return reset(ctx);
+  if (s.step === 'EDIT_DESC') {
+    const cat = loadCatalog(s.catalog);
+    const item = cat.items.find(i => i.name === s.itemName);
+    item.description = text;
+    saveCatalog(s.catalog, cat);
+    delete adminState[ctx.from.id];
+    return ctx.reply('✅ Описание обновлено', Markup.removeKeyboard());
   }
 });
 
-// ===== PHOTO =====
+// ---------- PHOTO HANDLER ----------
 bot.on('photo', ctx => {
   const s = adminState[ctx.from.id];
-  if (!s || s.mode !== 'add' || s.step !== 'ITEM_PHOTO') return;
+  if (!s) return;
 
   const fileId = ctx.message.photo.at(-1).file_id;
-  const data = loadCatalog(s.catalog);
 
-  data.items.push({
-    id: Date.now().toString(),
-    name: s.name,
-    description: s.description,
-    image: fileId,
-    subcategories: []
-  });
+  if (s.step === 'ADD_ITEM_IMAGE') {
+    s.image = fileId;
+    s.step = 'ADD_VAR_TYPE';
+    return ctx.reply('Тип вариации:');
+  }
 
-  saveCatalog(s.catalog, data);
-  ctx.reply('✅ Товар добавлен');
-  reset(ctx);
+  if (s.step === 'ADD_VAR_IMAGE') {
+    s.variants.push({
+      type: s.varType,
+      price: s.varPrice,
+      image: fileId
+    });
+    s.step = 'ADD_MORE_VAR';
+    return ctx.reply(
+      'Добавить ещё вариацию?',
+      Markup.keyboard([['➕ Да', '❌ Нет']]).oneTime()
+    );
+  }
+
+  if (s.step === 'EDIT_IMAGE') {
+    const cat = loadCatalog(s.catalog);
+    const item = cat.items.find(i => i.name === s.itemName);
+    item.image = fileId;
+    saveCatalog(s.catalog, cat);
+    delete adminState[ctx.from.id];
+    return ctx.reply('✅ Фото обновлено', Markup.removeKeyboard());
+  }
 });
-
+// ================== END ADMIN LOGIC ==================
 
 // ===== VARIATION =====
 bot.on('text', ctx => {
