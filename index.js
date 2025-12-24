@@ -96,7 +96,10 @@ bot.start(ctx => {
   ctx.reply(
     '🛍 Магазин',
     Markup.inlineKeyboard([
-      Markup.button.webApp('Открыть магазин', WEBAPP_URL)
+      Markup.button.webApp(
+        'Открыть магазин',
+        'https://cracker228.github.io'
+      )
     ])
   );
 });
