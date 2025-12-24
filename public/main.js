@@ -218,32 +218,40 @@ window.placeOrder = async (total) => {
 
 // === ПРОФИЛЬ ===
 function renderProfile(container) {
-  container.innerHTML = `
-    <h2>👤 Профиль</h2>
+  container.innerHTML = 
+    <h2>👤 Личный кабинет</h2>
 
-    <label>📍 Адрес доставки</label>
-    <textarea id="addr" style="width:100%">${deliveryAddress}</textarea>
+    <div style="margin-bottom:12px; opacity:.8">
+      ${tgUser ? `Вы вошли как <b>${tgUser.first_name}</b>` : ''}
+    </div>
 
-    <label>📞 Телефон</label>
-    <input id="phone" value="${phoneNumber}" style="width:100%">
+    <label style="display:block; margin:12px 0;">
+      Адрес доставки:
+      <textarea
+        id="delivery-address"
+        rows="3"
+        placeholder="Улица, дом, квартира"
+        style="width:100%; padding:12px;"
+      >${deliveryAddress}</textarea>
+    </label>
 
-    <button onclick="saveProfile()">💾 Сохранить</button>
+    <label style="display:block; margin:12px 0;">
+      Телефон:
+      <input
+        id="phone-number"
+        type="tel"
+        placeholder="+7..."
+        value="${phoneNumber}"
+        style="width:100%; padding:12px;"
+      />
+    </label>
+
+    <button onclick="saveProfile()" style="width:100%; padding:12px;">
+      💾 Сохранить
+    </button>
   `;
 }
 
-window.saveProfile = () => {
-  deliveryAddress = document.getElementById('addr').value.trim();
-  phoneNumber = document.getElementById('phone').value.trim();
-
-  if (!deliveryAddress || !phoneNumber) {
-    alert('Заполните все поля');
-    return;
-  }
-
-  localStorage.setItem('deliveryAddress', deliveryAddress);
-  localStorage.setItem('phoneNumber', phoneNumber);
-  alert('✅ Сохранено');
-};
 
 // === START ===
 document.addEventListener('DOMContentLoaded', () => {
