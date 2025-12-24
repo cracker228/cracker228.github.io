@@ -174,22 +174,69 @@ function renderCart(container) {
 
 // === ЗАКАЗ ===
 window.placeOrder = async (total) => {
-  const message = `💰 Заказ на ${total} ₽`;
-  await fetch(`${API_BASE_URL}/order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message })
-  });
-  cart = [];
-  localStorage.setItem('cart', '[]');
-  alert('✅ Заказ отправлен');
-  navigate('catalog');
+  if (!cart.length) {
+    alert('Корзина пуста');
+    return;
+  }
+
+  if (!deliveryAddress || !phoneNumber) {
+    alert('❗ Укажите адрес и телефон в профиле');
+    navigate('profile');
+    return;
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: cart,
+        total,
+        address: deliveryAddress,
+        phone: phoneNumber,
+        userId
+      })
+    });
+
+    cart = [];
+    localStorage.setItem('cart', '[]');
+    alert('✅ Заказ отправлен');
+    navigate('catalog');
+  } catch (e) {
+    alert('❌ Ошибка отправки заказа');
+    console.error(e);
+  }
 };
+
 
 // === ПРОФИЛЬ ===
 function renderProfile(container) {
-  container.innerHTML = `<h2>👤 Профиль</h2>`;
+  container.innerHTML = `
+    <h2>👤 Профиль</h2>
+
+    <label>📍 Адрес доставки</label>
+    <textarea id="addr" style="width:100%">${deliveryAddress}</textarea>
+
+    <label>📞 Телефон</label>
+    <input id="phone" value="${phoneNumber}" style="width:100%">
+
+    <button onclick="saveProfile()">💾 Сохранить</button>
+  `;
 }
+
+window.saveProfile = () => {
+  deliveryAddress = document.getElementById('addr').value.trim();
+  phoneNumber = document.getElementById('phone').value.trim();
+
+  if (!deliveryAddress || !phoneNumber) {
+    alert('Заполните все поля');
+    return;
+  }
+
+  localStorage.setItem('deliveryAddress', deliveryAddress);
+  localStorage.setItem('phoneNumber', phoneNumber);
+  alert('✅ Сохранено');
+};
 
 // === START ===
 document.addEventListener('DOMContentLoaded', () => {
