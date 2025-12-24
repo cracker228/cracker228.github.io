@@ -13,8 +13,12 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
-const tg = window.Telegram.WebApp;
 const userId = tg.initDataUnsafe?.user?.id;
+const tg = window.Telegram.WebApp;
+tg.ready();
+
+const tgUser = tg.initDataUnsafe?.user;
+
 
 // === URL BACKEND (RENDER) ===
 const API_BASE_URL = 'https://cracker228-github-io.onrender.com';
