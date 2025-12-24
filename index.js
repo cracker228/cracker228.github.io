@@ -347,9 +347,7 @@ bot.on('photo', ctx => {
 // ================== END ADMIN LOGIC ==================
 
 // ===== VARIATION =====
-bot.on('text', ctx => {
-  const s = state[ctx.from.id];
-  if (!s) return;
+
 
   if (s.step === 'ADD_VAR_TYPE') {
     s.varType = ctx.message.text;
