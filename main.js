@@ -172,17 +172,43 @@ function renderCart(container) {
 
 // === ЗАКАЗ ===
 window.placeOrder = async (total) => {
-  const message = `💰 Заказ на ${total} ₽`;
-  await fetch(`${API_BASE_URL}/order`, {
+  const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
+  const address = localStorage.getItem('deliveryAddress');
+  const phone = localStorage.getItem('phoneNumber');
+
+  if (!address || !phone) {
+    alert('Заполните адрес и телефон');
+    return;
+  }
+
+  const payload = {
+    phone,
+    address,
+    payment: paymentMethod === 'cash' ? 'Наличными' : 'Переводом',
+    total,
+    items: cart.map(i => ({
+      name: i.name,
+      type: i.type,
+      price: i.price
+    }))
+  };
+
+  const res = await fetch(`${API_BASE_URL}/order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message })
+    body: JSON.stringify(payload)
   });
-  cart = [];
-  localStorage.setItem('cart', '[]');
-  alert('✅ Заказ отправлен');
-  navigate('catalog');
+
+  if (res.ok) {
+    alert('Заказ отправлен');
+    cart = [];
+    localStorage.removeItem('cart');
+    navigate('catalog');
+  } else {
+    alert('Ошибка сервера');
+  }
 };
+
 
 // === ПРОФИЛЬ ===
 function renderProfile(container) {
