@@ -174,37 +174,40 @@ function renderCart(container) {
 
 // === ЗАКАЗ ===
 window.placeOrder = async (total) => {
-  if (!cart.length) {
-    alert('Корзина пуста');
+  const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
+  const address = localStorage.getItem('deliveryAddress');
+  const phone = localStorage.getItem('phoneNumber');
+
+  if (!address || !phone) {
+    alert('Заполните адрес и телефон');
     return;
   }
 
-  if (!deliveryAddress || !phoneNumber) {
-    alert('❗ Укажите адрес и телефон в профиле');
-    navigate('profile');
-    return;
-  }
+  const payload = {
+    phone,
+    address,
+    payment: paymentMethod === 'cash' ? 'Наличными' : 'Переводом',
+    total,
+    items: cart.map(i => ({
+      name: i.name,
+      type: i.type,
+      price: i.price
+    }))
+  };
 
-  try {
-    await fetch(`${API_BASE_URL}/order`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: cart,
-        total,
-        address: deliveryAddress,
-        phone: phoneNumber,
-        userId
-      })
-    });
+  const res = await fetch(`${API_BASE_URL}/order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
+  if (res.ok) {
+    alert('Заказ отправлен');
     cart = [];
-    localStorage.setItem('cart', '[]');
-    alert('✅ Заказ отправлен');
+    localStorage.removeItem('cart');
     navigate('catalog');
-  } catch (e) {
-    alert('❌ Ошибка отправки заказа');
-    console.error(e);
+  } else {
+    alert('Ошибка сервера');
   }
 };
 
