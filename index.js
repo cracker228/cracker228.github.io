@@ -67,14 +67,44 @@ app.get('/tg-image/:fileId', async (req, res) => {
 });
 
 app.post('/order', async (req, res) => {
-  const roles = loadRoles();
-  for (const id in roles) {
-    if (isAdmin(id)) {
-      await bot.telegram.sendMessage(id, req.body.message);
+  try {
+    const { items, total, address, phone, userId } = req.body;
+
+    if (!items?.length || !address || !phone) {
+      return res.status(400).send('Invalid order');
     }
+
+    const itemsText = items
+      .map(i => `• ${i.name} (${i.type}) — ${i.price} ₽`)
+      .join('\n');
+
+    const message = `
+🛒 НОВЫЙ ЗАКАЗ
+
+👤 Пользователь: ${userId || 'неизвестно'}
+📞 Телефон: ${phone}
+📍 Адрес: ${address}
+
+📦 Товары:
+${itemsText}
+
+💰 Итого: ${total} ₽
+    `.trim();
+
+    const roles = loadRoles();
+    for (const id in roles) {
+      if (['admin', 'superadmin', 'courier'].includes(roles[id])) {
+        await bot.telegram.sendMessage(id, message);
+      }
+    }
+
+    res.send('ok');
+  } catch (e) {
+    console.error('ORDER ERROR:', e);
+    res.sendStatus(500);
   }
-  res.send('ok');
 });
+
 
 // ================== ADMIN LOGIC ==================
 const adminState = {};
