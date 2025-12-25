@@ -121,10 +121,104 @@ bot.command('admin', ctx => {
   );
 });
 
+bot.hears('✏️ Редактировать товар', ctx => {
+  if (!isAdmin(ctx.from.id)) return;
+
+  state[ctx.from.id] = { step: 'EDIT_SELECT_CAT' };
+  ctx.reply('Номер каталога (1–4):');
+});
+
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s) return;
+
+  if (s.step === 'EDIT_SELECT_CAT') {
+    s.catalog = Number(ctx.message.text);
+    const catalog = loadCatalog(s.catalog);
+
+    if (!catalog.items.length) {
+      delete state[ctx.from.id];
+      return ctx.reply('❌ В каталоге нет товаров');
+    }
+
+    s.step = 'EDIT_SELECT_ITEM';
+
+    return ctx.reply(
+      'Выберите товар:',
+      Markup.keyboard(
+        catalog.items.map(i => [i.name]).concat([['⬅️ Назад']])
+      ).resize()
+    );
+  }
+
+  if (s.step === 'EDIT_SELECT_ITEM') {
+    const catalog = loadCatalog(s.catalog);
+    const item = catalog.items.find(i => i.name === ctx.message.text);
+
+    if (!item) return ctx.reply('❌ Товар не найден');
+
+    s.itemId = item.id;
+    s.step = 'EDIT_MENU';
+
+    return ctx.reply(
+      'Что редактировать?',
+      Markup.keyboard([
+        ['📝 Название', '📄 Описание'],
+        ['🖼 Фото'],
+        ['⬅️ Назад']
+      ]).resize()
+    );
+  }
+
+  if (s.step === 'EDIT_MENU') {
+    s.editField = ctx.message.text;
+    s.step = 'EDIT_VALUE';
+
+    return ctx.reply('Введите новое значение:');
+  }
+
+  if (s.step === 'EDIT_VALUE') {
+    const catalog = loadCatalog(s.catalog);
+    const item = catalog.items.find(i => i.id === s.itemId);
+
+    if (s.editField === '📝 Название') item.name = ctx.message.text;
+    if (s.editField === '📄 Описание') item.description = ctx.message.text;
+
+    saveCatalog(s.catalog, catalog);
+    delete state[ctx.from.id];
+
+    return ctx.reply('✅ Товар обновлён', Markup.removeKeyboard());
+  }
+});
+bot.hears('✏️ Переименовать каталог', ctx => {
+  if (!isAdmin(ctx.from.id)) return;
+  state[ctx.from.id] = { step: 'RENAME_CAT' };
+  ctx.reply('Номер каталога (1–4):');
+});
+
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s) return;
+
+  if (s.step === 'RENAME_CAT') {
+    s.catalog = Number(ctx.message.text);
+    s.step = 'RENAME_VALUE';
+    return ctx.reply('Новое название каталога:');
+  }
+
+  if (s.step === 'RENAME_VALUE') {
+    const catalog = loadCatalog(s.catalog);
+    catalog.name = ctx.message.text;
+    saveCatalog(s.catalog, catalog);
+    delete state[ctx.from.id];
+    ctx.reply('✅ Каталог переименован');
+  }
+});
 bot.hears('⬅️ Назад', ctx => {
   delete state[ctx.from.id];
   ctx.reply('Главное меню', Markup.removeKeyboard());
 });
+
 
 /* ===== TEXT ===== */
 bot.on('text', ctx => {
@@ -203,32 +297,46 @@ bot.on('text', ctx => {
   }
 
   /* DELETE */
-  if (text === '🗑 Удалить товар') {
-    s.step = 'DEL_CAT';
-    return ctx.reply('Каталог (1–4):');
-  }
+ bot.hears('🗑 Удалить товар', ctx => {
+  if (!isAdmin(ctx.from.id)) return;
+
+  state[ctx.from.id] = { step: 'DEL_CAT' };
+  ctx.reply('Каталог (1–4):');
+});
+
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s) return;
 
   if (s.step === 'DEL_CAT') {
-    s.catalog = Number(text);
-    const cat = loadCatalog(s.catalog);
+    s.catalog = Number(ctx.message.text);
+    const catalog = loadCatalog(s.catalog);
+
+    if (!catalog.items.length) {
+      delete state[ctx.from.id];
+      return ctx.reply('❌ Каталог пуст');
+    }
+
     s.step = 'DEL_ITEM';
+
     return ctx.reply(
-      'Выберите товар:',
+      'Выберите товар для удаления:',
       Markup.keyboard(
-        cat.items.map(i => [`${i.id} | ${i.name}`]).concat([['⬅️ Назад']])
+        catalog.items.map(i => [i.name]).concat([['⬅️ Назад']])
       ).resize()
     );
   }
 
   if (s.step === 'DEL_ITEM') {
-    const id = text.split('|')[0].trim();
-    const cat = loadCatalog(s.catalog);
-    cat.items = cat.items.filter(i => i.id !== id);
-    saveCatalog(s.catalog, cat);
+    const catalog = loadCatalog(s.catalog);
+    catalog.items = catalog.items.filter(i => i.name !== ctx.message.text);
+    saveCatalog(s.catalog, catalog);
+
     delete state[ctx.from.id];
-    return ctx.reply('✅ Товар удалён', Markup.removeKeyboard());
+    ctx.reply('🗑 Товар удалён', Markup.removeKeyboard());
   }
 });
+
 
 /* ===== PHOTO ===== */
 bot.on('photo', ctx => {
