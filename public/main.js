@@ -15,7 +15,8 @@ let phoneNumber = localStorage.getItem('phoneNumber') || '';
 
 // === URL ===
 const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
-const GITHUB_API = 'https://cracker228.github.io/api';
+const API = 'https://cracker228-github-io.onrender.com/api';
+
 
 // DOM
 const content = document.getElementById('content');
@@ -44,7 +45,7 @@ async function renderCatalogLine(container) {
 
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${GITHUB_API}/catalog${i}.json?_=${Date.now()}`);
+      const res = await fetch(`${API}/catalog/${id}`);
       if (!res.ok) continue;
       const data = await res.json();
 
@@ -59,7 +60,7 @@ async function renderCatalogLine(container) {
 
 // === ТОВАРЫ ===
 async function renderCatalogItems(container, id) {
-  const res = await fetch(`${GITHUB_API}/catalog${id}.json?_=${Date.now()}`);
+  const res = await fetch(`${API}/catalog/${id}`);
   const data = await res.json();
 
   container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
@@ -86,7 +87,7 @@ async function renderCatalogItems(container, id) {
 
 // === ВАРИАЦИИ ===
 async function showVariants(itemId, catalogId) {
-  const res = await fetch(`${GITHUB_API}/catalog${catalogId}.json?_=${Date.now()}`);
+  const res = await fetch(`${API}/catalog/${id}`);
   const data = await res.json();
   const item = data.items.find(i => i.id === itemId);
 
@@ -199,4 +200,3 @@ window.saveProfile = () => {
 
 // === START ===
 document.addEventListener('DOMContentLoaded', () => navigate('catalog'));
-
