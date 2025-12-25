@@ -51,13 +51,16 @@ async function renderCatalogLine(container) {
 
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${GITHUB_CATALOG_BASE}/catalog${i}.json?_=${Date.now()}`);
+      const res = await fetch(
+        `https://cracker228.github.io/api/catalog${i}.json?_=${Date.now()}`
+      );
       if (!res.ok) continue;
 
       const data = await res.json();
+
       container.innerHTML += `
-        <button style="width:100%;padding:12px;margin:8px 0"
-          onclick="navigate('catalog-items', ${i})">
+        <button onclick="navigate('catalog-items', ${i})"
+          style="width:100%; padding:12px; margin:8px 0;">
           ${data.name || `Каталог ${i}`}
         </button>
       `;
@@ -67,10 +70,13 @@ async function renderCatalogLine(container) {
   }
 }
 
+
 // === ТОВАРЫ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`${GITHUB_CATALOG_BASE}/catalog${catalogId}.json?_=${Date.now()}`);
+    const res = await fetch(
+      `https://cracker228.github.io/api/catalog${catalogId}.json?_=${Date.now()}`
+    );
     if (!res.ok) throw new Error();
 
     const data = await res.json();
@@ -79,7 +85,7 @@ async function renderCatalogItems(container, catalogId) {
 
     data.items.forEach(item => {
       const img = item.image
-        ? `${BACKEND_URL}/tg-image/${item.image}`
+        ? `https://cracker228-github-io.onrender.com/tg-image/${item.image}`
         : 'https://via.placeholder.com/160?text=Нет+фото';
 
       const card = document.createElement('div');
@@ -95,6 +101,7 @@ async function renderCatalogItems(container, catalogId) {
     container.innerHTML = '<p>❌ Ошибка каталога</p>';
   }
 }
+
 
 // === ВАРИАЦИИ ===
 async function showVariants(item, catalogId) {
