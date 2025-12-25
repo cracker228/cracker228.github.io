@@ -1,9 +1,8 @@
 // === ПРОВЕРКА TELEGRAM ===
-if (typeof window.Telegram === 'undefined') {
+if (!window.Telegram || !window.Telegram.WebApp) {
   document.body.innerHTML = `
-    <div style="padding:20px; text-align:center; font-family:sans-serif;">
-      <h2>⚠️ Этот сайт работает только внутри Telegram</h2>
-      <p>Откройте его через Mini App в боте</p>
+    <div style="padding:20px; text-align:center;">
+      <h2>⚠️ Только внутри Telegram</h2>
     </div>
   `;
   throw new Error('Not in Telegram');
@@ -11,7 +10,6 @@ if (typeof window.Telegram === 'undefined') {
 
 const tg = window.Telegram.WebApp;
 tg.ready();
-
 const tgUser = tg.initDataUnsafe?.user;
 
 // === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
@@ -20,8 +18,9 @@ let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 let currentCatalogId = null;
 
-// === BACKEND URL ===
-const API_BASE_URL = 'https://cracker228-github-io.onrender.com';
+// === URL ===
+const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
+const GITHUB_CATALOG_BASE = 'https://cracker228.github.io';
 
 // === НАВИГАЦИЯ ===
 function renderNavbar(active) {
@@ -29,9 +28,9 @@ function renderNavbar(active) {
   if (!nav) return;
 
   nav.innerHTML = `
-    <button onclick="navigate('catalog')" class="${active === 'catalog' ? 'active' : ''}">🛍️</button>
-    <button onclick="navigate('cart')" class="${active === 'cart' ? 'active' : ''}">🛒</button>
-    <button onclick="navigate('profile')" class="${active === 'profile' ? 'active' : ''}">👤</button>
+    <button onclick="navigate('catalog')" ${active === 'catalog' ? 'class="active"' : ''}>🛍️</button>
+    <button onclick="navigate('cart')" ${active === 'cart' ? 'class="active"' : ''}>🛒</button>
+    <button onclick="navigate('profile')" ${active === 'profile' ? 'class="active"' : ''}>👤</button>
   `;
 }
 
@@ -40,36 +39,25 @@ function navigate(page, catalogId = null) {
   const content = document.getElementById('content');
   if (!content) return;
 
-  switch (page) {
-    case 'catalog':
-      renderCatalogLine(content);
-      break;
-    case 'catalog-items':
-      currentCatalogId = catalogId;
-      renderCatalogItems(content, catalogId);
-      break;
-    case 'cart':
-      renderCart(content);
-      break;
-    case 'profile':
-      renderProfile(content);
-      break;
-  }
+  if (page === 'catalog') renderCatalogLine(content);
+  if (page === 'catalog-items') renderCatalogItems(content, catalogId);
+  if (page === 'cart') renderCart(content);
+  if (page === 'profile') renderProfile(content);
 }
 
-// === КАТАЛОГИ ===
+// === КАТАЛОГИ (GITHUB) ===
 async function renderCatalogLine(container) {
   container.innerHTML = '<h2>🛍 Каталоги</h2>';
 
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/catalog/${i}`);
+      const res = await fetch(`${GITHUB_CATALOG_BASE}/catalog${i}.json?_=${Date.now()}`);
       if (!res.ok) continue;
 
       const data = await res.json();
       container.innerHTML += `
-        <button onclick="navigate('catalog-items', ${i})"
-          style="width:100%; padding:12px; margin:8px 0;">
+        <button style="width:100%;padding:12px;margin:8px 0"
+          onclick="navigate('catalog-items', ${i})">
           ${data.name || `Каталог ${i}`}
         </button>
       `;
@@ -82,7 +70,7 @@ async function renderCatalogLine(container) {
 // === ТОВАРЫ ===
 async function renderCatalogItems(container, catalogId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/catalog/${catalogId}`);
+    const res = await fetch(`${GITHUB_CATALOG_BASE}/catalog${catalogId}.json?_=${Date.now()}`);
     if (!res.ok) throw new Error();
 
     const data = await res.json();
@@ -91,7 +79,7 @@ async function renderCatalogItems(container, catalogId) {
 
     data.items.forEach(item => {
       const img = item.image
-        ? `${API_BASE_URL}/tg-image/${item.image}`
+        ? `${BACKEND_URL}/tg-image/${item.image}`
         : 'https://via.placeholder.com/160?text=Нет+фото';
 
       const card = document.createElement('div');
@@ -110,23 +98,21 @@ async function renderCatalogItems(container, catalogId) {
 
 // === ВАРИАЦИИ ===
 async function showVariants(item, catalogId) {
-  const res = await fetch(`${API_BASE_URL}/api/catalog/${catalogId}`);
+  const res = await fetch(`${GITHUB_CATALOG_BASE}/catalog${catalogId}.json?_=${Date.now()}`);
   const data = await res.json();
   const target = data.items.find(i => i.id === item.id);
 
   let html = `<h3>${item.name}</h3>`;
   target.subcategories.forEach(sub => {
     const img = sub.image
-      ? `${API_BASE_URL}/tg-image/${sub.image}`
+      ? `${BACKEND_URL}/tg-image/${sub.image}`
       : 'https://via.placeholder.com/100?text=Нет+фото';
 
     html += `
       <div>
         <img src="${img}" width="100">
         <b>${sub.type}</b> — ${sub.price} ₽
-        <button onclick="addToCart('${item.id}','${item.name}','${sub.type}',${sub.price})">
-          🛒
-        </button>
+        <button onclick="addToCart('${item.id}','${item.name}','${sub.type}',${sub.price})">🛒</button>
       </div>
     `;
   });
@@ -182,12 +168,11 @@ window.placeOrder = async total => {
   const payload = {
     phone: phoneNumber,
     address: deliveryAddress,
-    payment: 'Наличными',
     total,
     items: cart
   };
 
-  const res = await fetch(`${API_BASE_URL}/order`, {
+  const res = await fetch(`${BACKEND_URL}/order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
