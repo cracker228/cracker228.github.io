@@ -13,114 +13,140 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 
-// === URL ===
+// === URL (исправлено: убраны пробелы в конце) ===
 const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
 const API = 'https://cracker228-github-io.onrender.com/api';
-
 
 // DOM
 const content = document.getElementById('content');
 const navbar = document.getElementById('navbar');
 
+// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+function escapeHtmlAttr(str) {
+  return str.replace(/'/g, "\\'");
+}
+
 // === NAV ===
 function renderNavbar(active) {
   navbar.innerHTML = `
-    <button onclick="navigate('catalog')" class="${active==='catalog'?'active':''}">🛍️</button>
-    <button onclick="navigate('cart')" class="${active==='cart'?'active':''}">🛒</button>
-    <button onclick="navigate('profile')" class="${active==='profile'?'active':''}">👤</button>
+    <button onclick="navigate('catalog')" class="${active === 'catalog' ? 'active' : ''}">🛍️</button>
+    <button onclick="navigate('cart')" class="${active === 'cart' ? 'active' : ''}">🛒</button>
+    <button onclick="navigate('profile')" class="${active === 'profile' ? 'active' : ''}">👤</button>
   `;
 }
 
 function navigate(page, id = null) {
   renderNavbar(page);
   if (page === 'catalog') renderCatalogLine(content);
-  if (page === 'catalog-items') renderCatalogItems(content, id);
-  if (page === 'cart') renderCart(content);
-  if (page === 'profile') renderProfile(content);
+  else if (page === 'catalog-items') renderCatalogItems(content, id);
+  else if (page === 'cart') renderCart(content);
+  else if (page === 'profile') renderProfile(content);
 }
 
-// === КАТАЛОГИ (GitHub) ===
+// === КАТАЛОГИ ===
 async function renderCatalogLine(container) {
   container.innerHTML = '<h2>🛍 Каталоги</h2>';
+  let hasCatalogs = false;
 
   for (let i = 1; i <= 4; i++) {
     try {
-      const res = await fetch(`${API}/catalog/${id}`);
+      const res = await fetch(`${API}/catalog/${i}`);
       if (!res.ok) continue;
       const data = await res.json();
+      hasCatalogs = true;
 
       container.innerHTML += `
         <button onclick="navigate('catalog-items', ${i})">
           ${data.name || `Каталог ${i}`}
         </button>
       `;
-    } catch {}
+    } catch (err) {
+      console.warn(`Не удалось загрузить каталог ${i}:`, err);
+    }
+  }
+
+  if (!hasCatalogs) {
+    container.innerHTML += '<p>Нет доступных каталогов</p>';
   }
 }
 
 // === ТОВАРЫ ===
 async function renderCatalogItems(container, id) {
-  const res = await fetch(`${API}/catalog/${id}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`${API}/catalog/${id}`);
+    if (!res.ok) throw new Error('Каталог не найден');
+    const data = await res.json();
 
-  container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
-  const itemsDiv = document.getElementById('items-list');
+    container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
+    const itemsDiv = document.getElementById('items-list');
 
-  data.items.forEach(item => {
-    const img = item.image
-      ? `${BACKEND_URL}/tg-image/${item.image}`
-      : 'https://via.placeholder.com/300x300?text=Нет+фото';
+    data.items.forEach(item => {
+      const img = item.image
+        ? `${BACKEND_URL}/tg-image/${item.image}`
+        : 'https://via.placeholder.com/300x300?text=Нет+фото';
 
-    const card = document.createElement('div');
-    card.className = 'product-card';
-    card.innerHTML = `
-      <img src="${img}">
-      <div class="product-info">
-        <h3>${item.name}</h3>
-        <p>${item.description || ''}</p>
-      </div>
-    `;
-    card.onclick = () => showVariants(item.id, id);
-    itemsDiv.appendChild(card);
-  });
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.innerHTML = `
+        <img src="${img}" onerror="this.src='https://via.placeholder.com/300x300?text=Нет+фото'">
+        <div class="product-info">
+          <h3>${item.name}</h3>
+          <p>${item.description || ''}</p>
+        </div>
+      `;
+      card.onclick = () => showVariants(item.id, id);
+      itemsDiv.appendChild(card);
+    });
+  } catch (err) {
+    container.innerHTML = `<p>Ошибка загрузки: ${err.message}</p>`;
+  }
 }
 
 // === ВАРИАЦИИ ===
 async function showVariants(itemId, catalogId) {
-  const res = await fetch(`${API}/catalog/${id}`);
-  const data = await res.json();
-  const item = data.items.find(i => i.id === itemId);
+  try {
+    const res = await fetch(`${API}/catalog/${catalogId}`);
+    if (!res.ok) throw new Error('Каталог недоступен');
+    const data = await res.json();
+    const item = data.items.find(i => i.id === itemId);
+    if (!item) throw new Error('Товар не найден');
 
-  let html = `<h3>${item.name}</h3>`;
+    let html = `<h3>${item.name}</h3>`;
 
-  item.subcategories.forEach(sub => {
-    const img = sub.image
-      ? `${BACKEND_URL}/tg-image/${sub.image}`
-      : 'https://via.placeholder.com/100';
+    item.subcategories.forEach(sub => {
+      const img = sub.image
+        ? `${BACKEND_URL}/tg-image/${sub.image}`
+        : 'https://via.placeholder.com/100';
 
-    html += `
-      <div class="variant-card">
-        <img src="${img}">
-        <div class="variant-content">
-          <div class="variant-name">${sub.type}</div>
-          <div class="variant-price">${sub.price} ₽</div>
-          <button class="add-to-cart-btn"
-            onclick="addToCart('${item.name}','${sub.type}',${sub.price})">
-            🛒 В корзину
-          </button>
+      const safeName = escapeHtmlAttr(item.name);
+      const safeType = escapeHtmlAttr(sub.type);
+
+      html += `
+        <div class="variant-card">
+          <img src="${img}" onerror="this.src='https://via.placeholder.com/100'">
+          <div class="variant-content">
+            <div class="variant-name">${sub.type}</div>
+            <div class="variant-price">${sub.price} ₽</div>
+            <button class="add-to-cart-btn"
+              onclick="addToCart('${safeName}', '${safeType}', ${sub.price})">
+              🛒 В корзину
+            </button>
+          </div>
         </div>
-      </div>
-    `;
-  });
+      `;
+    });
 
-  content.innerHTML = html;
+    content.innerHTML = html;
+  } catch (err) {
+    content.innerHTML = `<p>Ошибка: ${err.message}</p>`;
+  }
 }
 
 // === CART ===
 window.addToCart = (name, type, price) => {
   cart.push({ name, type, price });
   localStorage.setItem('cart', JSON.stringify(cart));
-  alert('Добавлено');
+  alert('Добавлено в корзину');
 };
 
 function renderCart(container) {
@@ -129,63 +155,76 @@ function renderCart(container) {
     return;
   }
 
-  let total = cart.reduce((s, i) => s + i.price, 0);
+  let total = cart.reduce((sum, item) => sum + item.price, 0);
   let html = '<h2>Корзина</h2>';
 
-  cart.forEach((i, idx) => {
+  cart.forEach((item, idx) => {
     html += `
       <div>
-        ${i.name} (${i.type}) — ${i.price} ₽
+        ${item.name} (${item.type}) — ${item.price} ₽
         <button onclick="removeFromCart(${idx})">❌</button>
       </div>
     `;
   });
 
   html += `
-    <b>Итого: ${total} ₽</b>
+    <p><b>Итого: ${total} ₽</b></p>
     <button onclick="placeOrder(${total})">Оформить заказ</button>
   `;
 
   container.innerHTML = html;
 }
 
-window.removeFromCart = i => {
-  cart.splice(i, 1);
+window.removeFromCart = (index) => {
+  cart.splice(index, 1);
   localStorage.setItem('cart', JSON.stringify(cart));
   navigate('cart');
 };
 
 // === ORDER ===
-window.placeOrder = async total => {
-  if (!deliveryAddress || !phoneNumber) {
+window.placeOrder = async (total) => {
+  if (!deliveryAddress.trim() || !phoneNumber.trim()) {
+    alert('Заполните адрес и телефон в профиле');
     navigate('profile');
     return;
   }
 
-  await fetch(`${BACKEND_URL}/order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      phone: phoneNumber,
-      address: deliveryAddress,
-      total,
-      items: cart
-    })
-  });
+  try {
+    const res = await fetch(`${BACKEND_URL}/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phoneNumber,
+        address: deliveryAddress,
+        total,
+        items: cart
+      })
+    });
 
-  cart = [];
-  localStorage.removeItem('cart');
-  alert('Заказ отправлен');
-  navigate('catalog');
+    if (!res.ok) throw new Error('Не удалось отправить заказ');
+
+    cart = [];
+    localStorage.removeItem('cart');
+    alert('Заказ успешно отправлен!');
+    navigate('catalog');
+  } catch (err) {
+    alert('Ошибка отправки заказа: ' + err.message);
+  }
 };
 
 // === PROFILE ===
 function renderProfile(container) {
   container.innerHTML = `
     <h2>👤 Профиль</h2>
-    ${tgUser ? `<p>${tgUser.first_name}</p>` : ''}
-    <textarea id="addr" placeholder="Адрес">${deliveryAddress}</textarea>
-    <input id="phone" placeholder="+7..." value="${phoneNumber}">
+    ${tgUser ? `<p>Привет, ${tgUser.first_name}!</p>` : ''}
+    <label>
+      Адрес доставки:<br>
+      <textarea id="addr" placeholder="Укажите полный адрес">${deliveryAddress}</textarea>
+    </label><br><br>
+    <label>
+      Телефон:<br>
+      <input id="phone" type="tel" placeholder="+7..." value="${phoneNumber}">
+    </label><br><br>
     <button onclick="saveProfile()">Сохранить</button>
   `;
 }
@@ -195,8 +234,14 @@ window.saveProfile = () => {
   phoneNumber = document.getElementById('phone').value.trim();
   localStorage.setItem('deliveryAddress', deliveryAddress);
   localStorage.setItem('phoneNumber', phoneNumber);
-  alert('Сохранено');
+  alert('Данные сохранены');
 };
 
-// === START ===
-document.addEventListener('DOMContentLoaded', () => navigate('catalog'));
+// === ЗАПУСК ===
+document.addEventListener('DOMContentLoaded', () => {
+  if (!content || !navbar) {
+    document.body.innerHTML = '<h3>Ошибка: отсутствуют #content или #navbar</h3>';
+    return;
+  }
+  navigate('catalog');
+});
