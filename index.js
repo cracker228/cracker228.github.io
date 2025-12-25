@@ -5,18 +5,18 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
-/* ================== CONFIG ================== */
+/* ===== CONFIG ===== */
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
 const PORT = process.env.PORT || 3000;
-const WEBAPP_URL = 'https://cracker228.github.io'; // mini app
+const WEBAPP_URL = 'https://cracker228.github.io';
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ================== FILES ================== */
+/* ===== FILES ===== */
 const DATA_DIR = path.join(__dirname, 'catalogs');
 const ROLES_FILE = path.join(__dirname, 'roles.json');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
@@ -28,14 +28,14 @@ if (!fs.existsSync(ROLES_FILE)) {
   );
 }
 
-/* ================== ROLES ================== */
+/* ===== ROLES ===== */
 const loadRoles = () => JSON.parse(fs.readFileSync(ROLES_FILE));
 const saveRoles = r => fs.writeFileSync(ROLES_FILE, JSON.stringify(r, null, 2));
 const roleOf = id => loadRoles()[id];
 const isAdmin = id => ['admin', 'superadmin'].includes(roleOf(id));
 const isSuper = id => roleOf(id) === 'superadmin';
 
-/* ================== CATALOG ================== */
+/* ===== CATALOG ===== */
 const catalogPath = n => path.join(DATA_DIR, `catalog${n}.json`);
 
 function loadCatalog(n) {
@@ -49,7 +49,7 @@ function saveCatalog(n, data) {
   fs.writeFileSync(catalogPath(n), JSON.stringify(data, null, 2));
 }
 
-/* ================== API ================== */
+/* ===== API ===== */
 app.get('/api/catalog/:id', (req, res) => {
   const id = Number(req.params.id);
   if (![1,2,3,4].includes(id)) return res.sendStatus(400);
@@ -66,18 +66,21 @@ app.get('/tg-image/:fileId', async (req, res) => {
 });
 
 app.post('/order', async (req, res) => {
-  const { phone, address, items, total, payment } = req.body;
+  const { phone, address, items, total } = req.body;
   if (!items?.length) return res.sendStatus(400);
 
-  const text =
+  let text =
 `📦 НОВЫЙ ЗАКАЗ
 📞 ${phone}
 🏠 ${address}
-💳 ${payment}
 💰 ${total} ₽
 
 Товары:
-${items.map(i => `• ${i.name} (${i.type}) — ${i.price} ₽`).join('\n')}`;
+`;
+
+  items.forEach(i => {
+    text += `• ${i.name} (${i.type}) — ${i.price} ₽\n`;
+  });
 
   const roles = loadRoles();
   for (const id in roles) {
@@ -88,23 +91,20 @@ ${items.map(i => `• ${i.name} (${i.type}) — ${i.price} ₽`).join('\n')}`;
   res.send('ok');
 });
 
-/* ================== STATE ================== */
+/* ===== STATE ===== */
 const state = {};
 
-/* ================== START ================== */
+/* ===== START ===== */
 bot.start(ctx => {
   ctx.reply(
     '🛍 Магазин',
     Markup.inlineKeyboard([
-      Markup.button.webApp(
-        'Открыть магазин',
-        'https://cracker228.github.io'
-      )
+      Markup.button.webApp('Открыть магазин', WEBAPP_URL)
     ])
   );
 });
 
-/* ================== ADMIN MENU ================== */
+/* ===== ADMIN ===== */
 bot.command('admin', ctx => {
   if (!isAdmin(ctx.from.id)) return ctx.reply('❌ Нет доступа');
 
@@ -126,13 +126,13 @@ bot.hears('⬅️ Назад', ctx => {
   ctx.reply('Главное меню', Markup.removeKeyboard());
 });
 
-/* ================== ADMIN LOGIC ================== */
-bot.on('text', async ctx => {
+/* ===== TEXT ===== */
+bot.on('text', ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
   const text = ctx.message.text;
 
-  /* ===== SUPERADMIN ===== */
+  /* ADMIN */
   if (text === '👑 Назначить админа' && isSuper(ctx.from.id)) {
     s.step = 'SET_ADMIN';
     return ctx.reply('ID пользователя:');
@@ -146,7 +146,7 @@ bot.on('text', async ctx => {
     return ctx.reply('✅ Админ назначен');
   }
 
-  /* ===== ADD PRODUCT ===== */
+  /* ADD PRODUCT */
   if (text === '➕ Добавить товар') {
     s.step = 'ADD_CAT';
     return ctx.reply('Каталог (1–4):');
@@ -202,7 +202,7 @@ bot.on('text', async ctx => {
     }
   }
 
-  /* ===== DELETE PRODUCT ===== */
+  /* DELETE */
   if (text === '🗑 Удалить товар') {
     s.step = 'DEL_CAT';
     return ctx.reply('Каталог (1–4):');
@@ -214,7 +214,9 @@ bot.on('text', async ctx => {
     s.step = 'DEL_ITEM';
     return ctx.reply(
       'Выберите товар:',
-      Markup.keyboard(cat.items.map(i => [`${i.id} | ${i.name}`]).concat([['⬅️ Назад']])).resize()
+      Markup.keyboard(
+        cat.items.map(i => [`${i.id} | ${i.name}`]).concat([['⬅️ Назад']])
+      ).resize()
     );
   }
 
@@ -228,7 +230,7 @@ bot.on('text', async ctx => {
   }
 });
 
-/* ================== PHOTO ================== */
+/* ===== PHOTO ===== */
 bot.on('photo', ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
@@ -256,7 +258,7 @@ bot.on('photo', ctx => {
   }
 });
 
-/* ================== RUN ================== */
+/* ===== RUN ===== */
 app.listen(PORT, () => console.log('🚀 Server started'));
 bot.launch();
 console.log('🤖 Bot started');
