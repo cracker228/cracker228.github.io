@@ -208,8 +208,8 @@ window.removeFromCart = (i) => {
   renderCart(content);
 };
 
-// === ORDER (ГАРАНТИРОВАННО РАБОТАЮЩИЙ МЕТОД) ===
-window.placeOrder = () => {
+// === ORDER (РАБОЧИЙ ВАРИАНТ ЧЕРЕЗ POST ЗАПРОС) ===
+window.placeOrder = async () => {
   try {
     // 1. Проверка корзины
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -219,55 +219,63 @@ window.placeOrder = () => {
 
     // 2. Проверка профиля
     if (!deliveryAddress.trim() || !phoneNumber.trim()) {
-      tg.showAlert('⚠️ Заполните профиль');
+      tg.showAlert('⚠️ Заполните профиль (адрес и телефон)');
       navigate('profile');
       return;
     }
 
-    // 3. Создаем безопасные данные заказа
+    // 3. Создаем данные заказа
     const safeItems = cart.map(item => ({
       name: (item.name || 'Товар без названия').toString().trim(),
       variant: (item.type || 'Без вариации').toString().trim(),
       price: Number(item.price) || 0
     }));
 
-    // 4. Рассчитываем итог
     const total = safeItems.reduce((sum, item) => sum + item.price, 0);
 
-    // 5. Формируем заказ
-    const orderData = {
-      items: safeItems,
-      contact: phoneNumber.trim(),
-      address: deliveryAddress.trim(),
-      total: total,
-      timestamp: new Date().toISOString(),
-      userId: tgUser?.id || 'unknown'
-    };
-
-    // 6. КОДИРУЕМ ДАННЫЕ ДЛЯ ОТПРАВКИ ЧЕРЕЗ ССЫЛКУ
-    const encodedData = encodeURIComponent(JSON.stringify(orderData));
+    // 4. ОТПРАВЛЯЕМ ЗАКАЗ ЧЕРЕЗ POST ЗАПРОС
+    tg.showAlert('📤 Отправка заказа...');
     
-    // 7. ФОРМИРУЕМ DEEP LINK ДЛЯ БОТА
-    const botUsername = 'cracker228_bot';
-    const deepLink = `https://t.me/${botUsername}?start=order_${encodedData}`;
+    const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
     
-    console.log('🔗 Deep Link:', deepLink);
+    const response = await fetch(`${BACKEND_URL}/order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: 'Новый заказ',
+        items: safeItems,
+        contact: phoneNumber.trim(),
+        address: deliveryAddress.trim(),
+        total: total,
+        userId: tgUser?.id || 'unknown'
+      })
+    });
 
-    // 8. ПОКАЗЫВАЕМ ПОДТВЕРЖДЕНИЕ
-    tg.showAlert(`✅ Заказ на ${total} ₽ будет отправлен админу.\nВы будете перенаправлены в бота для подтверждения.`);
+    const result = await response.json();
     
-    // 9. ДАЁМ ВРЕМЯ НА ПОКАЗ АЛЕРТА
-    setTimeout(() => {
-      // 10. ОТКРЫВАЕМ ССЫЛКУ В TELEGRAM
-      tg.openTelegramLink(deepLink);
-    }, 1500);
-
+    if (response.ok && result.success) {
+      // 5. Очищаем корзину
+      cart = [];
+      localStorage.setItem('cart', JSON.stringify(cart));
+      
+      tg.showAlert('✅ Заказ успешно оформлен!');
+      console.log('✅ Заказ оформлен, корзина очищена');
+      
+      // Закрываем WebApp
+      setTimeout(() => {
+        tg.close();
+      }, 1000);
+    } else {
+      throw new Error(result.error || 'Ошибка сервера');
+    }
+    
   } catch (error) {
     console.error('❌ Ошибка при оформлении заказа:', error);
-    tg.showAlert(`❌ Ошибка: ${error.message || 'Произошла ошибка при оформлении заказа'}`);
+    tg.showAlert(`❌ Ошибка: ${error.message || 'Неизвестная ошибка'}`);
   }
 };
-
 // === PROFILE ===
 function renderProfile(container) {
   container.innerHTML = `
