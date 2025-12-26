@@ -1,87 +1,85 @@
+require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-if (!process.env.BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN is not defined');
+/* ================== CONFIG ================== */
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
+const PORT = process.env.PORT || 3000;
+
+if (!BOT_TOKEN) {
+  console.error('❌ BOT_TOKEN missing');
   process.exit(1);
 }
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
-/* ================== ДАННЫЕ ================== */
-const ADMINS_FILE = './admins.json';
-const CATALOG_DIR = './catalogs';
+/* ================== STORAGE ================== */
+const DATA_DIR = path.join(__dirname, 'catalogs');
+const ADMINS_FILE = path.join(__dirname, 'admins.json');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(ADMINS_FILE)) fs.writeFileSync(ADMINS_FILE, JSON.stringify([ADMIN_ID], null, 2));
+
 const state = {};
 
-if (!fs.existsSync(CATALOG_DIR)) {
-  fs.mkdirSync(CATALOG_DIR, { recursive: true });
-}
-
 /* ================== HELPERS ================== */
-function loadAdmins() {
-  if (!fs.existsSync(ADMINS_FILE)) {
-    const root = process.env.ADMIN_CHAT_ID
-      ? [Number(process.env.ADMIN_CHAT_ID)]
-      : [];
-    fs.writeFileSync(ADMINS_FILE, JSON.stringify(root, null, 2));
+const loadAdmins = () => JSON.parse(fs.readFileSync(ADMINS_FILE));
+const isAdmin = id => loadAdmins().includes(id);
+
+const catPath = id => path.join(DATA_DIR, `catalog${id}.json`);
+const loadCatalog = id => {
+  if (!fs.existsSync(catPath(id))) {
+    fs.writeFileSync(catPath(id), JSON.stringify({ name: `Каталог ${id}`, items: [] }, null, 2));
   }
-  return JSON.parse(fs.readFileSync(ADMINS_FILE));
-}
-
-function isAdmin(id) {
-  return loadAdmins().includes(id);
-}
-
-function catPath(id) {
-  return path.join(CATALOG_DIR, `catalog${id}.json`);
-}
-
-function loadCatalog(id) {
-  const p = catPath(id);
-  if (!fs.existsSync(p)) {
-    fs.writeFileSync(p, JSON.stringify({ name: `Каталог ${id}`, items: [] }, null, 2));
-  }
-  return JSON.parse(fs.readFileSync(p));
-}
-
-function saveCatalog(id, data) {
+  return JSON.parse(fs.readFileSync(catPath(id)));
+};
+const saveCatalog = (id, data) =>
   fs.writeFileSync(catPath(id), JSON.stringify(data, null, 2));
-}
 
-/* ================== START ================== */
+/* ================== USER ================== */
 bot.start(ctx => {
+  ctx.reply(
+    '🛍 Магазин',
+    Markup.inlineKeyboard([
+      Markup.button.webApp(
+        'Открыть магазин',
+        'https://cracker228-github-io.onrender.com'
+      )
+    ])
+  );
+});
+
+/* ================== ADMIN ================== */
+bot.command('admin', ctx => {
   if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Нет доступа');
 
+  state[ctx.from.id] = {};
   ctx.reply(
     '⚙️ Админка',
     Markup.keyboard([
-      ['➕ Добавить товар', '🗑 Удалить товар'],
-      ['✏️ Переименовать каталог']
+      ['➕ Добавить товар'],
+      ['🗑 Удалить товар'],
+      ['✏️ Переименовать каталог'],
+      ['❌ Выход']
     ]).resize()
   );
 });
 
-/* ================== BUTTONS ================== */
+bot.hears('❌ Выход', ctx => {
+  delete state[ctx.from.id];
+  ctx.reply('Выход', Markup.removeKeyboard());
+});
+
+/* ================== ADD PRODUCT ================== */
 bot.hears('➕ Добавить товар', ctx => {
   if (!isAdmin(ctx.from.id)) return;
-  state[ctx.from.id] = { step: 'ADD_CAT', vars: [] };
+  state[ctx.from.id] = { step: 'CAT', vars: [] };
   ctx.reply('Номер каталога (1–4):');
 });
 
-bot.hears('🗑 Удалить товар', ctx => {
-  if (!isAdmin(ctx.from.id)) return;
-  state[ctx.from.id] = { step: 'DEL_CAT' };
-  ctx.reply('Номер каталога (1–4):');
-});
-
-bot.hears('✏️ Переименовать каталог', ctx => {
-  if (!isAdmin(ctx.from.id)) return;
-  state[ctx.from.id] = { step: 'REN_CAT' };
-  ctx.reply('Номер каталога (1–4):');
-});
-
-/* ================== TEXT ================== */
 bot.on('text', ctx => {
   if (!isAdmin(ctx.from.id)) return;
   const s = state[ctx.from.id];
@@ -89,143 +87,166 @@ bot.on('text', ctx => {
 
   const t = ctx.message.text;
 
-  switch (s.step) {
+  if (s.step === 'CAT') {
+    s.cat = Number(t);
+    s.step = 'NAME';
+    return ctx.reply('Название товара:');
+  }
 
-    case 'ADD_CAT': {
-      const n = Number(t);
-      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
-      s.catalog = n;
-      s.step = 'ADD_NAME';
-      return ctx.reply('Название товара:');
+  if (s.step === 'NAME') {
+    s.name = t;
+    s.step = 'DESC';
+    return ctx.reply('Описание товара:');
+  }
+
+  if (s.step === 'DESC') {
+    s.desc = t;
+    s.step = 'IMG';
+    return ctx.reply('📸 Фото товара:');
+  }
+
+  if (s.step === 'VAR_TYPE') {
+    s.vType = t;
+    s.step = 'VAR_PRICE';
+    return ctx.reply('Цена вариации:');
+  }
+
+  if (s.step === 'VAR_PRICE') {
+    s.vPrice = Number(t);
+    s.step = 'VAR_IMG';
+    return ctx.reply('📸 Фото вариации:');
+  }
+
+  if (s.step === 'MORE') {
+    if (t === '➕ Ещё вариация') {
+      s.step = 'VAR_TYPE';
+      return ctx.reply('Тип вариации:');
     }
 
-    case 'ADD_NAME':
-      s.name = t;
-      s.step = 'ADD_DESC';
-      return ctx.reply('Описание:');
-
-    case 'ADD_DESC':
-      s.desc = t;
-      s.step = 'ADD_IMAGE';
-      return ctx.reply('📸 Фото товара:');
-
-    case 'ADD_VAR_TYPE':
-      s.varType = t;
-      s.step = 'ADD_VAR_PRICE';
-      return ctx.reply('Цена:');
-
-    case 'ADD_VAR_PRICE':
-      s.varPrice = Number(t);
-      s.step = 'ADD_VAR_IMAGE';
-      return ctx.reply('📸 Фото вариации:');
-
-    case 'ADD_MORE':
-      if (t === '➕ Добавить ещё') {
-        s.step = 'ADD_VAR_TYPE';
-        return ctx.reply('Тип вариации:');
-      }
-
-      if (t === '✅ Завершить') {
-        const cat = loadCatalog(s.catalog);
-        cat.items.push({
-          id: Date.now().toString(),
-          name: s.name,
-          description: s.desc,
-          image: s.image,
-          subcategories: s.vars
-        });
-        saveCatalog(s.catalog, cat);
-        delete state[ctx.from.id];
-        return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
-      }
-      return;
-
-    case 'DEL_CAT': {
-      const n = Number(t);
-      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
-      s.catalog = n;
-      const c = loadCatalog(n);
-      if (!c.items.length) {
-        delete state[ctx.from.id];
-        return ctx.reply('Каталог пуст');
-      }
-      s.step = 'DEL_ITEM';
-      return ctx.reply(
-        'Выберите товар:',
-        Markup.keyboard(c.items.map(i => [i.name])).resize()
-      );
-    }
-
-    case 'DEL_ITEM': {
-      const c = loadCatalog(s.catalog);
-      c.items = c.items.filter(i => i.name !== t);
-      saveCatalog(s.catalog, c);
-      delete state[ctx.from.id];
-      return ctx.reply('🗑 Удалено', Markup.removeKeyboard());
-    }
-
-    case 'REN_CAT': {
-      const n = Number(t);
-      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
-      s.catalog = n;
-      s.step = 'REN_NAME';
-      return ctx.reply('Новое название:');
-    }
-
-    case 'REN_NAME': {
-      const c = loadCatalog(s.catalog);
-      c.name = t;
-      saveCatalog(s.catalog, c);
-      delete state[ctx.from.id];
-      return ctx.reply('✅ Переименовано');
-    }
+    const cat = loadCatalog(s.cat);
+    cat.items.push({
+      id: Date.now().toString(),
+      name: s.name,
+      description: s.desc,
+      image: s.image,
+      subcategories: s.vars
+    });
+    saveCatalog(s.cat, cat);
+    delete state[ctx.from.id];
+    return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
   }
 });
 
-/* ================== PHOTO ================== */
+/* ================== PHOTOS ================== */
 bot.on('photo', ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
 
   const fileId = ctx.message.photo.at(-1).file_id;
 
-  if (s.step === 'ADD_IMAGE') {
+  if (s.step === 'IMG') {
     s.image = fileId;
-    s.step = 'ADD_VAR_TYPE';
+    s.step = 'VAR_TYPE';
     return ctx.reply('Тип вариации:');
   }
 
-  if (s.step === 'ADD_VAR_IMAGE') {
+  if (s.step === 'VAR_IMG') {
     s.vars.push({
-      type: s.varType,
-      price: s.varPrice,
+      type: s.vType,
+      price: s.vPrice,
       image: fileId
     });
-
-    s.step = 'ADD_MORE';
+    s.step = 'MORE';
     return ctx.reply(
       'Добавить ещё?',
-      Markup.keyboard([['➕ Добавить ещё'], ['✅ Завершить']]).resize()
+      Markup.keyboard([['➕ Ещё вариация'], ['✅ Завершить']]).resize()
     );
   }
 });
-const express = require('express');
-const app = express();
 
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send('OK');
+/* ================== DELETE ================== */
+bot.hears('🗑 Удалить товар', ctx => {
+  if (!isAdmin(ctx.from.id)) return;
+  state[ctx.from.id] = { step: 'DEL_CAT' };
+  ctx.reply('Номер каталога (1–4):');
 });
 
-app.listen(PORT, () => {
-  console.log('🌐 HTTP server on port', PORT);
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s || s.step !== 'DEL_CAT') return;
+
+  s.cat = Number(ctx.message.text);
+  const cat = loadCatalog(s.cat);
+
+  if (!cat.items.length) {
+    delete state[ctx.from.id];
+    return ctx.reply('Каталог пуст');
+  }
+
+  s.step = 'DEL_ITEM';
+  ctx.reply(
+    'Выберите товар:',
+    Markup.keyboard(cat.items.map(i => [i.name])).resize()
+  );
 });
 
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s || s.step !== 'DEL_ITEM') return;
 
-/* ================== LAUNCH ================== */
-bot.launch();
-console.log('✅ Bot launched');
+  const cat = loadCatalog(s.cat);
+  cat.items = cat.items.filter(i => i.name !== ctx.message.text);
+  saveCatalog(s.cat, cat);
 
-process.once('SIGINT', () => bot.stop());
-process.once('SIGTERM', () => bot.stop());
+  delete state[ctx.from.id];
+  ctx.reply('🗑 Удалено', Markup.removeKeyboard());
+});
+
+/* ================== RENAME CATALOG ================== */
+bot.hears('✏️ Переименовать каталог', ctx => {
+  if (!isAdmin(ctx.from.id)) return;
+  state[ctx.from.id] = { step: 'REN_CAT' };
+  ctx.reply('Номер каталога (1–4):');
+});
+
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s || s.step !== 'REN_CAT') return;
+
+  s.cat = Number(ctx.message.text);
+  s.step = 'REN_NAME';
+  ctx.reply('Новое название:');
+});
+
+bot.on('text', ctx => {
+  const s = state[ctx.from.id];
+  if (!s || s.step !== 'REN_NAME') return;
+
+  const cat = loadCatalog(s.cat);
+  cat.name = ctx.message.text;
+  saveCatalog(s.cat, cat);
+
+  delete state[ctx.from.id];
+  ctx.reply('✅ Переименовано', Markup.removeKeyboard());
+});
+
+/* ================== IMAGE PROXY ================== */
+app.get('/tg-image/:id', async (req, res) => {
+  try {
+    const link = await bot.telegram.getFileLink(req.params.id);
+    res.redirect(link.href);
+  } catch {
+    res.sendStatus(404);
+  }
+});
+
+/* ================== SERVER ================== */
+app.get('/', (_, res) => res.send('OK'));
+app.listen(PORT, () => console.log('🌐 HTTP OK'));
+
+(async () => {
+  await bot.telegram.deleteWebhook();
+  await bot.launch();
+  console.log('🤖 Bot launched');
+})();
+
