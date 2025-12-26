@@ -1,8 +1,21 @@
+require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+/* ================== CONFIG ================== */
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
+const PORT = process.env.PORT || 3000;
+
+if (!BOT_TOKEN) {
+  console.error('❌ BOT_TOKEN missing');
+  process.exit(1);
+}
+
+const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
 /* ===== FILES ===== */
 const ADMINS_FILE = './admins.json';
@@ -208,3 +221,23 @@ bot.on('photo', ctx => {
 bot.launch();
 process.once('SIGINT', () => bot.stop());
 process.once('SIGTERM', () => bot.stop());
+
+/* ================== IMAGE PROXY ================== */
+app.get('/tg-image/:id', async (req, res) => {
+  try {
+    const link = await bot.telegram.getFileLink(req.params.id);
+    res.redirect(link.href);
+  } catch {
+    res.sendStatus(404);
+  }
+});
+
+/* ================== SERVER ================== */
+app.get('/', (_, res) => res.send('OK'));
+app.listen(PORT, () => console.log('🌐 HTTP OK'));
+
+(async () => {
+  await bot.telegram.deleteWebhook();
+  await bot.launch();
+  console.log('🤖 Bot launched');
+})();
