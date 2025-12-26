@@ -6,6 +6,7 @@ if (!window.Telegram || !window.Telegram.WebApp) {
 
 const tg = window.Telegram.WebApp;
 tg.ready();
+tg.expand();
 const tgUser = tg.initDataUnsafe?.user;
 
 // === ДАННЫЕ ===
@@ -13,7 +14,7 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 
-// === URL ===
+// === URL (ИСПРАВЛЕНО: убраны пробелы) ===
 const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
 const API = 'https://cracker228.github.io/catalogs';
 
@@ -51,12 +52,13 @@ async function renderCatalogLine(container) {
       const data = await res.json();
       found = true;
 
-      container.innerHTML += `
-        <button onclick="navigate('catalog-items', ${i})">
-          ${data.name || `Каталог ${i}`}
-        </button>
-      `;
-    } catch {}
+      const catalogBtn = document.createElement('button');
+      catalogBtn.innerHTML = data.name || `Каталог ${i}`;
+      catalogBtn.onclick = () => navigate('catalog-items', i);
+      container.appendChild(catalogBtn);
+    } catch (e) {
+      console.warn(`Каталог ${i} не загружен`, e);
+    }
   }
 
   if (!found) {
@@ -68,11 +70,16 @@ async function renderCatalogLine(container) {
 async function renderCatalogItems(container, id) {
   try {
     const res = await fetch(`${API}/catalog${id}.json?_=${Date.now()}`);
-    if (!res.ok) throw new Error();
+    if (!res.ok) throw new Error('Каталог не найден');
 
     const data = await res.json();
     container.innerHTML = `<h2>${data.name}</h2><div id="items-list"></div>`;
     const itemsDiv = document.getElementById('items-list');
+
+    if (!data.items || !data.items.length) {
+      itemsDiv.innerHTML = '<p>В каталоге нет товаров</p>';
+      return;
+    }
 
     data.items.forEach(item => {
       const img = item.image
@@ -82,136 +89,372 @@ async function renderCatalogItems(container, id) {
       const card = document.createElement('div');
       card.className = 'product-card';
       card.innerHTML = `
-        <img src="${img}">
+        <div class="product-image">
+          <img src="${img}" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300x300?text=Ошибка+загрузки'">
+        </div>
         <div class="product-info">
           <h3>${item.name}</h3>
-          <p>${item.description || ''}</p>
+          <p>${item.description || 'Описание отсутствует'}</p>
         </div>
       `;
-      card.onclick = () => showVariants(item.id, id);
+      card.onclick = () => showVariants(item.id, id, item.name, item.description);
       itemsDiv.appendChild(card);
     });
-  } catch {
+  } catch (e) {
+    console.error('Ошибка загрузки каталога:', e);
     container.innerHTML = '<p>❌ Ошибка загрузки каталога</p>';
   }
 }
 
 // === ВАРИАЦИИ ===
-async function showVariants(itemId, catalogId) {
-  const res = await fetch(`${API}/catalog${catalogId}.json?_=${Date.now()}`);
-  const data = await res.json();
-  const item = data.items.find(i => i.id === itemId);
-  if (!item) return;
+async function showVariants(itemId, catalogId, itemName, itemDesc) {
+  try {
+    const res = await fetch(`${API}/catalog${catalogId}.json?_=${Date.now()}`);
+    const data = await res.json();
+    const item = data.items.find(i => i.id === itemId);
+    if (!item) throw new Error('Товар не найден');
 
-  let html = `<h3>${item.name}</h3>`;
-
-  item.subcategories.forEach(sub => {
-    const img = sub.image
-      ? `${BACKEND_URL}/tg-image/${sub.image}`
-      : 'https://via.placeholder.com/100';
-
-    html += `
-      <div class="variant-card">
-        <img src="${img}">
-        <div class="variant-content">
-          <div class="variant-name">${sub.type}</div>
-          <div class="variant-price">${sub.price} ₽</div>
-          <button class="add-to-cart-btn"
-            onclick="addToCart('${item.name}','${sub.type}',${sub.price})">
-            🛒 В корзину
-          </button>
-        </div>
-      </div>
+    let html = `
+      <button onclick="navigate('catalog-items', ${catalogId})">← Назад</button>
+      <h3>${itemName}</h3>
+      <p>${itemDesc || ''}</p>
+      <div class="variants-container">
     `;
-  });
 
-  content.innerHTML = html;
+    if (!item.subcategories || !item.subcategories.length) {
+      html += '<p>Нет доступных вариаций</p>';
+    } else {
+      item.subcategories.forEach((sub, idx) => {
+        const img = sub.image
+          ? `${BACKEND_URL}/tg-image/${sub.image}`
+          : 'https://via.placeholder.com/100?text=Нет+фото';
+
+        html += `
+          <div class="variant-card">
+            <img src="${img}" onerror="this.src='https://via.placeholder.com/100?text=Ошибка'">
+            <div class="variant-content">
+              <div class="variant-name">${sub.type || 'Без названия'}</div>
+              <div class="variant-price">${sub.price || 0} ₽</div>
+              <button class="add-to-cart-btn" 
+                onclick="addToCart('${itemName.replace(/'/g, "\\'")}', 
+                                 '${(sub.type || '').replace(/'/g, "\\'")}', 
+                                 ${sub.price || 0})">
+                🛒 В корзину
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    html += '</div>';
+    content.innerHTML = html;
+  } catch (e) {
+    console.error('Ошибка загрузки вариаций:', e);
+    content.innerHTML = `<button onclick="navigate('catalog-items', ${catalogId})">← Назад</button><p>❌ Ошибка загрузки товара</p>`;
+  }
 }
 
 // === CART ===
 window.addToCart = (name, type, price) => {
-  cart.push({ name, type, price });
+  if (!price || price <= 0) {
+    alert('Некорректная цена товара');
+    return;
+  }
+
+  cart.push({ name, type, price: Number(price) });
   localStorage.setItem('cart', JSON.stringify(cart));
-  alert('Добавлено в корзину');
+  tg.showAlert('✅ Товар добавлен в корзину');
 };
 
 function renderCart(container) {
   if (!cart.length) {
-    container.innerHTML = '<h2>Корзина пуста</h2>';
+    container.innerHTML = `
+      <h2>🛒 Корзина</h2>
+      <p>Ваша корзина пуста</p>
+      <button onclick="navigate('catalog')">Выбрать товары</button>
+    `;
     return;
   }
 
-  let total = cart.reduce((s, i) => s + i.price, 0);
-  let html = '<h2>Корзина</h2>';
+  let total = cart.reduce((s, i) => s + Number(i.price), 0);
+  let html = `
+    <button onclick="navigate('catalog')">← Продолжить покупки</button>
+    <h2>🛒 Корзина</h2>
+  `;
 
   cart.forEach((i, idx) => {
     html += `
-      <div>
-        ${i.name} (${i.type}) — ${i.price} ₽
-        <button onclick="removeFromCart(${idx})">❌</button>
+      <div class="cart-item">
+        <span>${i.name} ${i.type ? `(${i.type})` : ''} — ${i.price} ₽</span>
+        <button onclick="removeFromCart(${idx})" class="remove-btn">❌</button>
       </div>
     `;
   });
 
   html += `
-    <p><b>Итого: ${total} ₽</b></p>
-    <button onclick="placeOrder(${total})">Оформить заказ</button>
+    <div class="cart-total">
+      <strong>Итого: ${total} ₽</strong>
+    </div>
+    <button onclick="placeOrder(${total})" class="checkout-btn">Оформить заказ</button>
   `;
 
   container.innerHTML = html;
 }
 
-window.removeFromCart = i => {
+window.removeFromCart = (i) => {
   cart.splice(i, 1);
   localStorage.setItem('cart', JSON.stringify(cart));
-  navigate('cart');
+  renderCart(content);
 };
 
-// === ORDER ===
-window.placeOrder = async total => {
+// === ORDER (ИСПРАВЛЕНО: отправка через Telegram WebApp) ===
+window.placeOrder = (total) => {
   if (!deliveryAddress || !phoneNumber) {
-    alert('Заполните профиль');
+    tg.showAlert('⚠️ Заполните профиль');
     navigate('profile');
     return;
   }
 
-  await fetch(`${BACKEND_URL}/order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      phone: phoneNumber,
-      address: deliveryAddress,
-      total,
-      items: cart
-    })
-  });
+  if (cart.length === 0) {
+    tg.showAlert('⚠️ Корзина пуста');
+    return;
+  }
 
-  cart = [];
-  localStorage.removeItem('cart');
-  alert('Заказ отправлен');
-  navigate('catalog');
+  // Формируем данные для отправки в Telegram
+  const orderData = {
+    items: cart.map(item => ({
+      name: item.name,
+      variant: item.type,
+      price: item.price
+    })),
+    contact: phoneNumber,
+    address: deliveryAddress,
+    total: total
+  };
+
+  // Отправляем данные в бота
+  tg.sendData(JSON.stringify(orderData));
+  
+  // Закрываем WebApp
+  tg.close();
 };
 
 // === PROFILE ===
 function renderProfile(container) {
   container.innerHTML = `
+    <button onclick="navigate('catalog')">← Назад</button>
     <h2>👤 Профиль</h2>
     ${tgUser ? `<p>Привет, ${tgUser.first_name}</p>` : ''}
-    <textarea id="addr" placeholder="Адрес">${deliveryAddress}</textarea>
-    <input id="phone" placeholder="+7..." value="${phoneNumber}">
-    <button onclick="saveProfile()">Сохранить</button>
+    <div class="form-group">
+      <label>Адрес доставки</label>
+      <textarea id="addr" placeholder="Укажите полный адрес">${deliveryAddress}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Телефон</label>
+      <input id="phone" placeholder="+7 (999) 123-45-67" type="tel" value="${phoneNumber}">
+    </div>
+    <button onclick="saveProfile()" class="save-btn">Сохранить</button>
   `;
 }
 
 window.saveProfile = () => {
-  deliveryAddress = addr.value.trim();
-  phoneNumber = phone.value.trim();
+  const newAddress = document.getElementById('addr').value.trim();
+  const newPhone = document.getElementById('phone').value.trim();
+
+  if (!newPhone || !/^\+?[0-9\s\-()]{10,}$/.test(newPhone)) {
+    tg.showAlert('⚠️ Укажите корректный телефон');
+    return;
+  }
+
+  deliveryAddress = newAddress;
+  phoneNumber = newPhone;
+  
   localStorage.setItem('deliveryAddress', deliveryAddress);
   localStorage.setItem('phoneNumber', phoneNumber);
-  alert('Сохранено');
+  
+  tg.showAlert('✅ Профиль сохранён');
 };
 
 // === START ===
 document.addEventListener('DOMContentLoaded', () => {
+  // Устанавливаем тему в соответствии с Telegram
+  document.body.className = tg.colorScheme;
+  
+  // Добавляем обработчики для кнопок "Назад"
+  tg.onEvent('backButtonClicked', () => {
+    const currentPath = window.location.hash || '#catalog';
+    if (currentPath.includes('catalog-items')) {
+      navigate('catalog');
+    } else if (currentPath.includes('cart') || currentPath.includes('profile')) {
+      navigate('catalog');
+    }
+  });
+  
+  // Показываем кнопку "Назад" при необходимости
+  tg.BackButton.show();
+  
+  // Стартуем с каталога
   navigate('catalog');
 });
+
+// === СТИЛИ ДЛЯ ПРИЛОЖЕНИЯ ===
+const style = document.createElement('style');
+style.textContent = `
+  :root {
+    --tg-theme-bg-color: #ffffff;
+    --tg-theme-text-color: #000000;
+    --tg-theme-button-color: #3390ec;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-hint-color: #999999;
+    --tg-theme-link-color: #3390ec;
+  }
+  
+  .dark {
+    --tg-theme-bg-color: #1a1a1a;
+    --tg-theme-text-color: #ffffff;
+    --tg-theme-button-color: #5da8ff;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-hint-color: #cccccc;
+    --tg-theme-link-color: #5da8ff;
+  }
+  
+  body {
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  
+  #content {
+    margin-bottom: 80px;
+  }
+  
+  #navbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: var(--tg-theme-bg-color);
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+    border-top: 1px solid var(--tg-theme-hint-color);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  }
+  
+  button {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 8px 0;
+    width: 100%;
+  }
+  
+  button.active {
+    opacity: 0.8;
+  }
+  
+  .product-card {
+    border: 1px solid var(--tg-theme-hint-color);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 12px 0;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  
+  .product-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .product-image img {
+    width: 100%;
+    height: 150px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  
+  .variants-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  
+  .variant-card {
+    border: 1px solid var(--tg-theme-hint-color);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+  
+  .variant-card img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    margin: 0 auto;
+  }
+  
+  .variant-name {
+    font-weight: bold;
+    margin: 8px 0;
+  }
+  
+  .variant-price {
+    color: var(--tg-theme-link-color);
+    font-size: 18px;
+    margin: 4px 0;
+  }
+  
+  .cart-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    border-bottom: 1px solid var(--tg-theme-hint-color);
+  }
+  
+  .remove-btn {
+    background: #ff5c5c;
+    padding: 4px 8px;
+    min-width: auto;
+  }
+  
+  .cart-total {
+    text-align: right;
+    font-size: 20px;
+    margin: 20px 0;
+    font-weight: bold;
+  }
+  
+  .checkout-btn {
+    background: #4CAF50;
+    font-size: 18px;
+    padding: 14px;
+  }
+  
+  .form-group {
+    margin: 16px 0;
+  }
+  
+  textarea, input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--tg-theme-hint-color);
+    border-radius: 8px;
+    background: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    margin-top: 6px;
+  }
+  
+  .save-btn {
+    background: #2196F3;
+  }
+`;
+document.head.appendChild(style);
