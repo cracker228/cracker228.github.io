@@ -559,6 +559,79 @@ bot.on('text', async (ctx) => {
   }
 });
 
+// Обработчик deep link для заказов
+bot.command('start', async (ctx) => {
+  const args = ctx.message.text.split(' ');
+  if (args.length > 1 && args[1].startsWith('order_')) {
+    try {
+      // Извлекаем и декодируем данные заказа
+      const encodedData = args[1].replace('order_', '');
+      const orderData = JSON.parse(decodeURIComponent(encodedData));
+      
+      // Информация о пользователе
+      const userId = ctx.from.id;
+      const userName = ctx.from.username 
+        ? `@${ctx.from.username}` 
+        : `${ctx.from.first_name} ${ctx.from.last_name || ''}`;
+      
+      // Формируем сообщение для админов
+      let orderMessage = `📦 <b>НОВЫЙ ЗАКАЗ</b>\n`;
+      orderMessage += `👤 <b>Покупатель:</b> ${userName} (ID: ${userId})\n\n`;
+      
+      // Добавляем товары из корзины
+      orderMessage += `<b>Состав заказа:</b>\n`;
+      orderData.items.forEach((item, index) => {
+        orderMessage += `${index + 1}. ${item.name}`;
+        if (item.variant) orderMessage += ` - ${item.variant}`;
+        orderMessage += ` — ${item.price} ₽\n`;
+      });
+      
+      // Добавляем общую сумму
+      orderMessage += `\n<b>Итого:</b> ${orderData.total} ₽\n`;
+      
+      // Добавляем контактные данные
+      if (orderData.contact) orderMessage += `\n📞 <b>Телефон:</b> ${orderData.contact}`;
+      if (orderData.address) orderMessage += `\n🏠 <b>Адрес:</b> ${orderData.address}`;
+      
+      // Кнопки для админов
+      const adminButtons = Markup.inlineKeyboard([
+        [Markup.button.callback('✅ Подтвердить заказ', `confirm_${userId}_${Date.now()}`)],
+        [Markup.button.callback('❌ Отклонить заказ', `reject_${userId}_${Date.now()}`)]
+      ]);
+
+      // Отправляем заказ всем админам
+      for (const adminId of adminCache) {
+        await bot.telegram.sendMessage(adminId, orderMessage, {
+          parse_mode: 'HTML',
+          reply_markup: adminButtons
+        });
+      }
+
+      // Подтверждение для пользователя
+      await ctx.replyWithHTML(
+        '✅ <b>Ваш заказ успешно передан администраторам!</b>\n\n' +
+        'Администратор скоро свяжется с вами для подтверждения заказа и уточнения деталей доставки.'
+      );
+      
+    } catch (error) {
+      console.error('❌ Ошибка обработки заказа через deep link:', error);
+      await ctx.replyWithHTML(
+        '❌ <b>Произошла ошибка при обработке заказа.</b>\n' +
+        'Пожалуйста, попробуйте оформить заказ снова или свяжитесь с администратором.'
+      );
+    }
+  } else {
+    // Обычное приветствие
+    const webAppUrl = 'https://cracker228.github.io/';
+    ctx.reply(
+      '👋 Добро пожаловать в магазин!\nНажмите кнопку ниже, чтобы открыть каталог.',
+      Markup.keyboard([
+        Markup.button.webApp('🛍 Открыть магазин', webAppUrl)
+      ]).resize()
+    );
+  }
+});
+
 /* ================== ЗАПУСК ================== */
 
 app.listen(PORT, () => {
