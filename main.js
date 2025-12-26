@@ -208,12 +208,12 @@ window.removeFromCart = (i) => {
   renderCart(content);
 };
 
-// === ORDER (ИСПРАВЛЕНО: отправка через Telegram WebApp) ===
-window.placeOrder = (total) => {
-  if (!deliveryAddress || !phoneNumber) {
-    tg.showAlert('⚠️ Заполните профиль');
-    navigate('profile');
-    return;
+// === ORDER (УЛУЧШЕННАЯ ВЕРСИЯ) ===
+window.placeOrder = () => {
+  // Проверяем наличие данных
+  if (!cart || !Array.isArray(cart)) {
+    cart = [];
+    localStorage.setItem('cart', JSON.stringify(cart));
   }
 
   if (cart.length === 0) {
@@ -221,25 +221,53 @@ window.placeOrder = (total) => {
     return;
   }
 
-  // Формируем данные для отправки в Telegram
-  const orderData = {
-    items: cart.map(item => ({
-      name: item.name,
-      variant: item.type,
-      price: item.price
-    })),
-    contact: phoneNumber,
-    address: deliveryAddress,
-    total: total
-  };
+  if (!deliveryAddress || !phoneNumber) {
+    tg.showAlert('⚠️ Заполните профиль');
+    navigate('profile');
+    return;
+  }
 
-  // Отправляем данные в бота
-  tg.sendData(JSON.stringify(orderData));
-  
-  // Закрываем WebApp
-  tg.close();
+  try {
+    // Создаем копию корзины с защитой от undefined
+    const safeItems = cart.map(item => ({
+      name: item.name || 'Товар без названия',
+      variant: item.type || 'Без вариации',
+      price: Number(item.price) || 0
+    }));
+    
+    // Рассчитываем итоговую сумму
+    const total = safeItems.reduce((sum, item) => sum + item.price, 0);
+    
+    // Формируем заказ с защитой от undefined
+    const orderData = {
+      items: safeItems,
+      contact: phoneNumber.trim() || 'Не указан',
+      address: deliveryAddress.trim() || 'Не указан',
+      total: total,
+      timestamp: new Date().toISOString(),
+      userId: tgUser?.id || 'unknown'
+    };
+
+    // Логируем для отладки (только в консоли)
+    console.log('Отправляем заказ:', orderData);
+    
+    // Сериализуем с дополнительной проверкой
+    const orderJson = JSON.stringify(orderData);
+    if (orderJson === "undefined") {
+      throw new Error('Ошибка формирования данных заказа');
+    }
+    
+    // Отправляем данные в бота
+    tg.sendData(orderJson);
+    
+    // Закрываем WebApp
+    tg.close();
+    
+  } catch (error) {
+    console.error('Ошибка при оформлении заказа:', error);
+    tg.showAlert(`❌ Ошибка: ${error.message || 'Неизвестная ошибка'}`);
+  }
 };
-
 // === PROFILE ===
 function renderProfile(container) {
   container.innerHTML = `
