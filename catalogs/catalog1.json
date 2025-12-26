@@ -1,4 +1,18 @@
 {
   "name": "Каталог 1",
-  "items": []
+  "items": [
+    {
+      "id": "1766769530279",
+      "name": "Привет",
+      "description": "Привте",
+      "image": "AgACAgIAAxkBAAIHZWlOw2YXCssmdKQaDkZzu8YLQvCiAALvC2sbz_B4Supq2h9QeibJAQADAgADeQADNgQ",
+      "subcategories": [
+        {
+          "type": "Попа",
+          "price": 100,
+          "image": "AgACAgIAAxkBAAIHa2lOw3cnWXu0VS97cFsKs6WeoJopAALwC2sbz_B4SllNdyXKOgy1AQADAgADbQADNgQ"
+        }
+      ]
+    }
+  ]
 }
