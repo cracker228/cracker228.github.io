@@ -1,8 +1,8 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 
 /* ================== CONFIG ================== */
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -28,116 +28,130 @@ if (!GITHUB_OWNER || !GITHUB_REPO || !GITHUB_TOKEN) {
   process.exit(1);
 }
 
-/* ===== FILES ===== */
-const ADMINS_FILE = './admins.json';
+// Кэш админов (в памяти)
+let adminCache = [ADMIN_ID]; // всегда включаем основного админа
+let adminsSha = null;
 
-// Создадим папку catalogs, если нет — для локального кэша (опционально)
-const CATALOG_DIR = './catalogs';
-if (!fs.existsSync(CATALOG_DIR)) fs.mkdirSync(CATALOG_DIR);
+/* ===== GITHUB HELPERS ===== */
 
-const state = {};
-
-/* ===== HELPERS ===== */
-
-function loadAdmins() {
-  if (!fs.existsSync(ADMINS_FILE)) fs.writeFileSync(ADMINS_FILE, '[]');
-  return JSON.parse(fs.readFileSync(ADMINS_FILE));
-}
-
-function isAdmin(id) {
-  return loadAdmins().includes(id);
-}
-
-function catalogPath(id) {
-  return path.join(CATALOG_DIR, `catalog${id}.json`);
-}
-
-// Асинхронная загрузка каталога с GitHub
-async function loadCatalogFromGitHub(catalogId) {
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/catalogs/catalog${catalogId}.json`;
+async function fetchFileFromGithub(filePath) {
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
   const headers = {
     Authorization: `Bearer ${GITHUB_TOKEN}`,
     Accept: 'application/vnd.github.v3+json',
   };
-
   try {
     const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-
+    if (!res.ok) return { sha: null, content: null };
     const data = await res.json();
     const content = Buffer.from(data.content, 'base64').toString('utf8');
-    return { sha: data.sha, content: JSON.parse(content) };
-  } catch (err) {
-    console.error('❌ Load catalog failed:', err.message);
-    // Если файла нет — создаем дефолтный
-    return {
-      sha: null,
-      content: { name: `Каталог ${catalogId}`, items: [] },
-    };
+    return { sha: data.sha, content };
+  } catch (e) {
+    return { sha: null, content: null };
   }
 }
 
-// Асинхронное сохранение каталога на GitHub
-async function saveCatalogToGitHub(catalogId, data, sha) {
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/catalogs/catalog${catalogId}.json`;
-  const headers = {
-    Authorization: `Bearer ${GITHUB_TOKEN}`,
-    Accept: 'application/vnd.github.v3+json',
-    'Content-Type': 'application/json',
-  };
-
+async function saveFileToGithub(filePath, data, sha = null) {
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
   const body = {
-    message: `Update catalog${catalogId} via admin bot`,
+    message: `Update ${filePath} via bot`,
     content: Buffer.from(JSON.stringify(data, null, 2), 'utf8').toString('base64'),
     branch: GITHUB_BRANCH,
   };
-
   if (sha) body.sha = sha;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  return res.ok;
+}
 
-  try {
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-    console.log(`✅ Catalog ${catalogId} saved to GitHub`);
-    return true;
-  } catch (err) {
-    console.error('❌ Save catalog failed:', err.message);
-    return false;
+// Загружает список админов с GitHub
+async function loadAdminsFromGithub() {
+  const { sha, content } = await fetchFileFromGithub('admins.json');
+  if (content) {
+    try {
+      const list = JSON.parse(content);
+      if (Array.isArray(list)) {
+        adminCache = [...new Set([...list, ADMIN_ID])]; // Уникальные + основной
+        adminsSha = sha;
+        return list;
+      }
+    } catch (e) {
+      console.error('admins.json parse error');
+    }
   }
+  // Если файла нет — создаём
+  await saveFileToGithub('admins.json', [ADMIN_ID], sha);
+  adminCache = [ADMIN_ID];
+  adminsSha = null;
+  return [ADMIN_ID];
 }
 
-// Обёртка: загрузка каталога (сначала пробуем GitHub, потом локальный fallback)
+function isAdmin(id) {
+  return adminCache.includes(Number(id));
+}
+
+// Загрузка при старте
+loadAdminsFromGithub();
+
+// Загрузка каталога (осталось как было)
 async function loadCatalog(catalogId) {
-  const { sha, content } = await loadCatalogFromGitHub(catalogId);
-  return { sha, catalog: content };
+  const { sha, content } = await fetchFileFromGithub(`catalogs/catalog${catalogId}.json`);
+  if (content) {
+    try {
+      return { sha, catalog: JSON.parse(content) };
+    } catch (e) {
+      // ignore
+    }
+  }
+  return { sha: null, catalog: { name: `Каталог ${catalogId}`, items: [] } };
 }
 
-// Обёртка: сохранение каталога
 async function saveCatalog(catalogId, data, sha) {
-  return await saveCatalogToGitHub(catalogId, data, sha);
+  return await saveFileToGithub(`catalogs/catalog${catalogId}.json`, data, sha);
 }
 
-/* ===== START ===== */
+/* ================== КОМАНДЫ ================== */
+
 bot.start(async ctx => {
-  delete state[ctx.from.id]; // Очищаем состояние при старте
+  delete state[ctx.from.id];
+  const domain = process.env.DOMAIN || 'your-username.github.io';
+  const repo = process.env.REPO || '';
+  const webAppUrl = `https://${domain}/${repo}`.replace(/\/+$/, '');
+  ctx.reply(
+    '👋 Добро пожаловать в магазин!\nНажмите кнопку ниже, чтобы открыть каталог.',
+    Markup.keyboard([
+      Markup.button.webApp('🛍 Открыть магазин', webAppUrl)
+    ]).resize()
+  );
+});
+
+bot.command('admin', ctx => {
   if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Нет доступа');
 
+  delete state[ctx.from.id];
   ctx.reply(
     '⚙️ Админка',
     Markup.keyboard([
       ['➕ Добавить товар'],
       ['🗑 Удалить товар'],
       ['✏️ Переименовать каталог'],
+      ['👮 Добавить админа'],
       ['⬅️ Выход']
     ]).resize()
   );
 });
 
-/* ===== BUTTONS ===== */
+const state = {};
+
+/* ================== КНОПКИ АДМИНКИ ================== */
+
 bot.hears('⬅️ Выход', ctx => {
   delete state[ctx.from.id];
   ctx.reply('Ок', Markup.removeKeyboard());
@@ -161,17 +175,67 @@ bot.hears('✏️ Переименовать каталог', ctx => {
   ctx.reply('Номер каталога (1–4):');
 });
 
-/* ===== TEXT LOGIC ===== */
-bot.on('text', async ctx => {
+// НОВАЯ КНОПКА
+bot.hears('👮 Добавить админа', ctx => {
   if (!isAdmin(ctx.from.id)) return;
-  const s = state[ctx.from.id];
-  if (!s) return;
+  state[ctx.from.id] = { step: 'ADD_ADMIN' };
+  ctx.reply('Введите ID нового админа (число):');
+});
 
+/* ================== ТЕКСТ ================== */
+
+bot.on('text', async ctx => {
+  if (ctx.message.text.startsWith('/')) return;
+
+  const userId = ctx.from.id;
+  if (!state[userId]) return;
+  if (!isAdmin(userId)) {
+    delete state[userId];
+    return;
+  }
+
+  const s = state[userId];
   const t = ctx.message.text;
+
+  // НОВЫЙ ШАГ: добавление админа
+  if (s.step === 'ADD_ADMIN') {
+    const newId = Number(t);
+    if (isNaN(newId) || newId <= 0) {
+      return ctx.reply('❌ ID должен быть положительным числом');
+    }
+
+    // Загружаем актуальный список
+    const currentAdmins = [...adminCache];
+    if (currentAdmins.includes(newId)) {
+      delete state[userId];
+      return ctx.reply('✅ Этот пользователь уже админ');
+    }
+
+    currentAdmins.push(newId);
+    // Удаляем дубликаты и убираем временный ADMIN_ID, если он был только в кэше
+    const saveList = [...new Set(currentAdmins.filter(id => id !== ADMIN_ID))];
+    if (!saveList.includes(ADMIN_ID)) saveList.unshift(ADMIN_ID);
+
+    // Сохраняем на GitHub
+    const ok = await saveFileToGithub('admins.json', saveList, adminsSha);
+    if (ok) {
+      // Обновляем кэш
+      adminCache = [...saveList];
+      // Попробуем обновить sha (не критично, если не получится)
+      const { sha } = await fetchFileFromGithub('admins.json');
+      adminsSha = sha;
+      delete state[userId];
+      ctx.reply(`✅ Пользователь ${newId} добавлен в админы`, Markup.removeKeyboard());
+    } else {
+      ctx.reply('❌ Не удалось сохранить админа. Проверьте права GitHub Token.');
+    }
+    return;
+  }
+
+  // ... остальные шаги (как в предыдущем коде)
 
   switch (s.step) {
 
-    /* === ADD PRODUCT === */
     case 'ADD_CAT':
       s.catalog = Number(t);
       if (isNaN(s.catalog) || s.catalog < 1 || s.catalog > 4) {
@@ -198,9 +262,7 @@ bot.on('text', async ctx => {
 
     case 'ADD_VAR_PRICE':
       s.varPrice = Number(t);
-      if (isNaN(s.varPrice)) {
-        return ctx.reply('❌ Введите число');
-      }
+      if (isNaN(s.varPrice)) return ctx.reply('❌ Введите число');
       s.step = 'ADD_VAR_IMAGE';
       return ctx.reply('📸 Фото вариации:');
 
@@ -210,7 +272,6 @@ bot.on('text', async ctx => {
         return ctx.reply('Тип вариации:');
       }
 
-      // Сохраняем товар
       const { sha, catalog } = await loadCatalog(s.catalog);
       catalog.items.push({
         id: Date.now().toString(),
@@ -220,47 +281,43 @@ bot.on('text', async ctx => {
         subcategories: s.vars
       });
 
-      const success = await saveCatalog(s.catalog, catalog, sha);
-      if (success) {
-        delete state[ctx.from.id];
-        return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
+      if (await saveCatalog(s.catalog, catalog, sha)) {
+        delete state[userId];
+        ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
       } else {
-        return ctx.reply('❌ Не удалось сохранить. Попробуйте позже.');
+        ctx.reply('❌ Ошибка сохранения');
       }
+      return;
 
-    /* === DELETE PRODUCT === */
     case 'DEL_CAT':
       s.catalog = Number(t);
       if (isNaN(s.catalog) || s.catalog < 1 || s.catalog > 4) {
         return ctx.reply('❌ Номер каталога должен быть от 1 до 4');
       }
 
-      const { sha: delSha, catalog: delCat } = await loadCatalog(s.catalog);
-
-      if (!delCat.items.length) {
-        delete state[ctx.from.id];
+      const dc = await loadCatalog(s.catalog);
+      if (!dc.catalog.items.length) {
+        delete state[userId];
         return ctx.reply('❌ Каталог пуст', Markup.removeKeyboard());
       }
 
       s.step = 'DEL_ITEM';
       return ctx.reply(
         'Выберите товар:',
-        Markup.keyboard(delCat.items.map(i => [i.name])).resize()
+        Markup.keyboard(dc.catalog.items.map(i => [i.name])).resize()
       );
 
     case 'DEL_ITEM':
-      const { sha: dSha, catalog: dCat } = await loadCatalog(s.catalog);
-      dCat.items = dCat.items.filter(i => i.name !== t);
-      const delSuccess = await saveCatalog(s.catalog, dCat, dSha);
-
-      if (delSuccess) {
-        delete state[ctx.from.id];
-        return ctx.reply('🗑 Товар удалён', Markup.removeKeyboard());
+      const dc2 = await loadCatalog(s.catalog);
+      dc2.catalog.items = dc2.catalog.items.filter(i => i.name !== t);
+      if (await saveCatalog(s.catalog, dc2.catalog, dc2.sha)) {
+        delete state[userId];
+        ctx.reply('🗑 Товар удалён', Markup.removeKeyboard());
       } else {
-        return ctx.reply('❌ Не удалось удалить. Попробуйте позже.');
+        ctx.reply('❌ Ошибка удаления');
       }
+      return;
 
-    /* === RENAME CATALOG === */
     case 'REN_CAT':
       s.catalog = Number(t);
       if (isNaN(s.catalog) || s.catalog < 1 || s.catalog > 4) {
@@ -270,27 +327,26 @@ bot.on('text', async ctx => {
       return ctx.reply('Новое название каталога:');
 
     case 'REN_NAME':
-      const { sha: rSha, catalog: rCat } = await loadCatalog(s.catalog);
-      rCat.name = t;
-      const renSuccess = await saveCatalog(s.catalog, rCat, rSha);
-
-      if (renSuccess) {
-        delete state[ctx.from.id];
-        return ctx.reply('✅ Каталог переименован', Markup.removeKeyboard());
+      const rc = await loadCatalog(s.catalog);
+      rc.catalog.name = t;
+      if (await saveCatalog(s.catalog, rc.catalog, rc.sha)) {
+        delete state[userId];
+        ctx.reply('✅ Каталог переименован', Markup.removeKeyboard());
       } else {
-        return ctx.reply('❌ Не удалось переименовать. Попробуйте позже.');
+        ctx.reply('❌ Ошибка переименования');
       }
+      return;
 
     default:
-      delete state[ctx.from.id];
-      return;
+      delete state[userId];
   }
 });
 
-/* ===== PHOTO LOGIC ===== */
+/* ================== ФОТО ================== */
+
 bot.on('photo', async ctx => {
   const s = state[ctx.from.id];
-  if (!s) return;
+  if (!s || !isAdmin(ctx.from.id)) return;
 
   const fileId = ctx.message.photo.at(-1).file_id;
 
@@ -315,11 +371,8 @@ bot.on('photo', async ctx => {
   }
 });
 
-/* ===== LAUNCH ===== */
-process.once('SIGINT', () => bot.stop());
-process.once('SIGTERM', () => bot.stop());
+/* ================== СЕРВЕР И ЗАПУСК ================== */
 
-/* ================== IMAGE PROXY ================== */
 app.get('/tg-image/:id', async (req, res) => {
   try {
     const link = await bot.telegram.getFileLink(req.params.id);
@@ -329,11 +382,12 @@ app.get('/tg-image/:id', async (req, res) => {
   }
 });
 
-/* ================== SERVER ================== */
 app.get('/', (_, res) => res.send('OK'));
 app.listen(PORT, () => console.log('🌐 HTTP OK'));
 
-/* ================== BOT LAUNCH ================== */
+process.once('SIGINT', () => bot.stop());
+process.once('SIGTERM', () => bot.stop());
+
 (async () => {
   await bot.telegram.deleteWebhook();
   await bot.launch();
