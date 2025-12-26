@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 /* ================== CONFIG ================== */
 const BOT_TOKEN = process.env.BOT_TOKEN;
