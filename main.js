@@ -467,11 +467,10 @@ window.placeOrder = async () => {
     // 7. ДЕТАЛЬНАЯ ОТЛАДКА ПЕРЕД ОТПРАВКОЙ
     console.log('🔍 Предотправочная проверка:');
     console.log('📱 tg:', tg);
-    console.log('📱 tg.WebApp:', tg.WebApp);
-    console.log('📱 tg.WebApp.sendData:', typeof tg.WebApp.sendData);
+    console.log('📱 tg.sendData:', typeof tg.sendData);
     
-    if (typeof tg.WebApp.sendData !== 'function') {
-      console.error('❌ tg.WebApp.sendData не является функцией!');
+    if (typeof tg.sendData !== 'function') {
+      console.error('❌ tg.sendData не является функцией!');
       tg.showAlert('❌ Ошибка: sendData не доступен');
       return;
     }
@@ -483,7 +482,7 @@ window.placeOrder = async () => {
     tg.showAlert('📤 Отправка заказа...\nСумма: ' + total + ' ₽');
     
     try {
-      tg.WebApp.sendData(orderJson);
+      tg.sendData(orderJson); // ✅ ИСПРАВЛЕНО: tg.sendData вместо tg.WebApp.sendData
       console.log('✅ Данные успешно отправлены в Telegram');
       
       // 9. Очищаем корзину и закрываем
@@ -652,8 +651,8 @@ function testOrderSend() {
   console.log('🔧 Тестовые данные:', testJson);
   
   try {
-    if (typeof tg.WebApp.sendData === 'function') {
-      tg.WebApp.sendData(testJson);
+    if (typeof tg.sendData === 'function') { // ✅ ИСПРАВЛЕНО: tg.sendData вместо tg.WebApp.sendData
+      tg.sendData(testJson); // ✅ ИСПРАВЛЕНО: tg.sendData вместо tg.WebApp.sendData
       console.log('✅ Тестовые данные успешно отправлены');
       tg.showAlert('✅ Тест отправлен успешно!');
     } else {
