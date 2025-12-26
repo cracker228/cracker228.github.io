@@ -14,7 +14,7 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let deliveryAddress = localStorage.getItem('deliveryAddress') || '';
 let phoneNumber = localStorage.getItem('phoneNumber') || '';
 
-// === URL (ИСПРАВЛЕНО: убраны пробелы) ===
+// === URL (ИСПРАВЛЕНО: УБРАНЫ ПРОБЕЛЫ) ===
 const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
 const API = 'https://cracker228.github.io/catalogs';
 
@@ -158,7 +158,7 @@ async function showVariants(itemId, catalogId, itemName, itemDesc) {
 // === CART ===
 window.addToCart = (name, type, price) => {
   if (!price || price <= 0) {
-    alert('Некорректная цена товара');
+    tg.showAlert('Некорректная цена товара');
     return;
   }
 
@@ -196,7 +196,7 @@ function renderCart(container) {
     <div class="cart-total">
       <strong>Итого: ${total} ₽</strong>
     </div>
-    <button onclick="placeOrder(${total})" class="checkout-btn">Оформить заказ</button>
+    <button onclick="placeOrder()" class="checkout-btn">Оформить заказ</button>
   `;
 
   container.innerHTML = html;
@@ -208,66 +208,66 @@ window.removeFromCart = (i) => {
   renderCart(content);
 };
 
-// === ORDER (УЛУЧШЕННАЯ ВЕРСИЯ) ===
+// === ORDER (ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ) ===
 window.placeOrder = () => {
-  // Проверяем наличие данных
-  if (!cart || !Array.isArray(cart)) {
-    cart = [];
-    localStorage.setItem('cart', JSON.stringify(cart));
-  }
-
-  if (cart.length === 0) {
-    tg.showAlert('⚠️ Корзина пуста');
-    return;
-  }
-
-  if (!deliveryAddress || !phoneNumber) {
-    tg.showAlert('⚠️ Заполните профиль');
-    navigate('profile');
-    return;
-  }
-
   try {
-    // Создаем копию корзины с защитой от undefined
+    // 1. Проверка корзины
+    if (!Array.isArray(cart) || cart.length === 0) {
+      tg.showAlert('⚠️ Корзина пуста');
+      return;
+    }
+
+    // 2. Проверка профиля
+    if (!deliveryAddress.trim() || !phoneNumber.trim()) {
+      tg.showAlert('⚠️ Заполните профиль');
+      navigate('profile');
+      return;
+    }
+
+    // 3. Создаем безопасные данные заказа
     const safeItems = cart.map(item => ({
-      name: item.name || 'Товар без названия',
-      variant: item.type || 'Без вариации',
+      name: (item.name || 'Товар без названия').toString(),
+      variant: (item.type || 'Без вариации').toString(),
       price: Number(item.price) || 0
     }));
-    
-    // Рассчитываем итоговую сумму
+
+    // 4. Рассчитываем итог
     const total = safeItems.reduce((sum, item) => sum + item.price, 0);
-    
-    // Формируем заказ с защитой от undefined
+
+    // 5. Формируем заказ
     const orderData = {
       items: safeItems,
-      contact: phoneNumber.trim() || 'Не указан',
-      address: deliveryAddress.trim() || 'Не указан',
+      contact: phoneNumber.trim(),
+      address: deliveryAddress.trim(),
       total: total,
       timestamp: new Date().toISOString(),
       userId: tgUser?.id || 'unknown'
     };
 
-    // Логируем для отладки (только в консоли)
-    console.log('Отправляем заказ:', orderData);
-    
-    // Сериализуем с дополнительной проверкой
+    console.log('🚀 Отправляем заказ:', orderData);
+
+    // 6. Сериализуем и проверяем
     const orderJson = JSON.stringify(orderData);
-    if (orderJson === "undefined") {
+    if (!orderJson || orderJson === 'undefined' || orderJson === '{}') {
       throw new Error('Ошибка формирования данных заказа');
     }
-    
-    // Отправляем данные в бота
+
+    // 7. Отправляем в Telegram
     tg.sendData(orderJson);
     
-    // Закрываем WebApp
+    // 8. Очищаем корзину и закрываем
+    cart = [];
+    localStorage.setItem('cart', JSON.stringify(cart));
     tg.close();
+
+    console.log('✅ Заказ успешно отправлен');
     
   } catch (error) {
-    console.error('Ошибка при оформлении заказа:', error);
-    tg.showAlert(`❌ Ошибка: ${error.message || 'Неизвестная ошибка'}`);
+    console.error('❌ Ошибка при оформлении заказа:', error);
+    tg.showAlert(`❌ ${error.message || 'Произошла ошибка при оформлении заказа'}`);
   }
 };
+
 // === PROFILE ===
 function renderProfile(container) {
   container.innerHTML = `
@@ -295,6 +295,11 @@ window.saveProfile = () => {
     return;
   }
 
+  if (newAddress.length < 5) {
+    tg.showAlert('⚠️ Адрес должен быть не менее 5 символов');
+    return;
+  }
+
   deliveryAddress = newAddress;
   phoneNumber = newPhone;
   
@@ -309,18 +314,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Устанавливаем тему в соответствии с Telegram
   document.body.className = tg.colorScheme;
   
-  // Добавляем обработчики для кнопок "Назад"
+  // Инициализация кнопки "Назад"
+  tg.BackButton.show();
   tg.onEvent('backButtonClicked', () => {
-    const currentPath = window.location.hash || '#catalog';
-    if (currentPath.includes('catalog-items')) {
+    const currentHash = window.location.hash || '#catalog';
+    
+    if (currentHash.includes('catalog-items')) {
       navigate('catalog');
-    } else if (currentPath.includes('cart') || currentPath.includes('profile')) {
+    } else if (currentHash.includes('cart') || currentHash.includes('profile')) {
       navigate('catalog');
+    } else {
+      tg.close();
     }
   });
-  
-  // Показываем кнопку "Назад" при необходимости
-  tg.BackButton.show();
   
   // Стартуем с каталога
   navigate('catalog');
@@ -407,6 +413,8 @@ style.textContent = `
     height: 150px;
     object-fit: contain;
     border-radius: 8px;
+    display: block;
+    margin: 0 auto;
   }
   
   .variants-container {
@@ -428,17 +436,20 @@ style.textContent = `
     height: 80px;
     object-fit: contain;
     margin: 0 auto;
+    display: block;
   }
   
   .variant-name {
     font-weight: bold;
     margin: 8px 0;
+    font-size: 16px;
   }
   
   .variant-price {
     color: var(--tg-theme-link-color);
     font-size: 18px;
     margin: 4px 0;
+    font-weight: bold;
   }
   
   .cart-item {
@@ -446,12 +457,14 @@ style.textContent = `
     justify-content: space-between;
     padding: 12px;
     border-bottom: 1px solid var(--tg-theme-hint-color);
+    align-items: center;
   }
   
   .remove-btn {
     background: #ff5c5c;
     padding: 4px 8px;
     min-width: auto;
+    border-radius: 4px;
   }
   
   .cart-total {
@@ -459,12 +472,16 @@ style.textContent = `
     font-size: 20px;
     margin: 20px 0;
     font-weight: bold;
+    padding: 10px 0;
+    border-top: 1px dashed var(--tg-theme-hint-color);
   }
   
   .checkout-btn {
     background: #4CAF50;
     font-size: 18px;
     padding: 14px;
+    width: 100%;
+    margin-top: 10px;
   }
   
   .form-group {
@@ -479,10 +496,17 @@ style.textContent = `
     background: var(--tg-theme-bg-color);
     color: var(--tg-theme-text-color);
     margin-top: 6px;
+    box-sizing: border-box;
   }
   
   .save-btn {
     background: #2196F3;
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  button:hover {
+    opacity: 0.9;
   }
 `;
 document.head.appendChild(style);
