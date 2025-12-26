@@ -1,12 +1,14 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
+const cors = require('cors'); // ДОБАВЬ ЭТУ ЗАВИСИМОСТЬ
 const fs = require('fs');
 
 /* ================== CONFIG ================== */
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = Number(process.env.ADMIN_CHAT_ID);
 const PORT = process.env.PORT || 3000;
+const BACKEND_URL = process.env.BACKEND_URL || 'https://cracker228-github-io.onrender.com'; // Укажи свой Render URL
 
 if (!BOT_TOKEN || !ADMIN_ID) {
   console.error('❌ BOT_TOKEN или ADMIN_CHAT_ID отсутствует');
@@ -15,6 +17,10 @@ if (!BOT_TOKEN || !ADMIN_ID) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+
+// ДОБАВЬ ЭТИ СТРОКИ ДЛЯ CORS И JSON
+app.use(cors());
+app.use(express.json());
 
 /* ===== GITHUB CONFIG ===== */
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
@@ -148,89 +154,95 @@ async function saveCatalog(catalogId, data, sha) {
   await loadAdminsFromGithub();
 })();
 
+/* ================== ЭНДПОИНТ ЗАКАЗОВ (ИЗ СТАРОГО БОТА) ================== */
+
+app.post('/order', async (req, res) => {
+  try {
+    const { message, items, contact, address, total, userId } = req.body;
+    
+    if (!message || !items || !contact || !address) {
+      return res.status(400).json({ error: 'Отсутствуют обязательные поля' });
+    }
+
+    // Формируем сообщение для админов
+    let orderMessage = `📦 <b>НОВЫЙ ЗАКАЗ</b>\n`;
+    orderMessage += `👤 <b>Покупатель:</b> ID ${userId}\n\n`;
+    
+    // Добавляем товары из корзины
+    orderMessage += `<b>Состав заказа:</b>\n`;
+    items.forEach((item, index) => {
+      orderMessage += `${index + 1}. ${item.name}`;
+      if (item.variant) orderMessage += ` - ${item.variant}`;
+      orderMessage += ` — ${item.price} ₽\n`;
+    });
+    
+    // Добавляем общую сумму
+    orderMessage += `\n<b>Итого:</b> ${total} ₽\n`;
+    
+    // Добавляем контактные данные
+    orderMessage += `\n📞 <b>Телефон:</b> ${contact}`;
+    orderMessage += `\n🏠 <b>Адрес:</b> ${address}`;
+    
+    // Отправляем заказ всем админам
+    let successCount = 0;
+    for (const adminId of adminCache) {
+      try {
+        await bot.telegram.sendMessage(adminId, orderMessage, {
+          parse_mode: 'HTML'
+        });
+        successCount++;
+      } catch (error) {
+        console.error(`❌ Не удалось отправить заказ админу ${adminId}:`, error);
+      }
+    }
+
+    if (successCount === 0) {
+      throw new Error('Не удалось отправить заказ ни одному админу');
+    }
+
+    // Ответ клиенту
+    res.json({ success: true, message: 'Заказ успешно оформлен!' });
+    
+    console.log(`✅ Заказ от пользователя ${userId} успешно обработан`);
+    
+  } catch (error) {
+    console.error('❌ Ошибка обработки заказа:', error);
+    
+    // Отправляем админам уведомление об ошибке
+    try {
+      const adminError = `🚨 <b>Ошибка оформления заказа</b>\n\n` +
+                         `Ошибка: ${error.message || 'Неизвестная ошибка'}\n` +
+                         `Данные: ${JSON.stringify(req.body, null, 2)}`;
+      
+      for (const adminId of adminCache) {
+        await bot.telegram.sendMessage(adminId, adminError, { parse_mode: 'HTML' });
+      }
+    } catch (e) {
+      console.error('Не удалось отправить уведомление об ошибке админам:', e);
+    }
+    
+    res.status(500).json({ error: 'Ошибка обработки заказа' });
+  }
+});
+
+/* ================== ДРУГИЕ ЭНДПОИНТЫ ================== */
+
+app.get('/tg-image/:id', async (req, res) => {
+  try {
+    const link = await bot.telegram.getFileLink(req.params.id);
+    res.redirect(link.href);
+  } catch (error) {
+    console.error('❌ Ошибка получения изображения:', error);
+    res.sendStatus(404);
+  }
+});
+
+app.get('/', (_, res) => res.send('OK'));
+
 /* ================== КОМАНДЫ ================== */
 
-// ✅ ЕДИНЫЙ ОБРАБОТЧИК /start
-bot.command('start', async (ctx) => {
+bot.start((ctx) => {
   delete state[ctx.from.id];
-  
-  const args = ctx.message.text.split(' ').slice(1);
-  
-  // Обработка deep link для заказов
-  if (args.length > 0 && args[0].startsWith('order_')) {
-    try {
-      // Извлекаем и декодируем данные заказа
-      const encodedData = args[0].replace('order_', '');
-      const orderData = JSON.parse(decodeURIComponent(encodedData));
-      
-      // Информация о пользователе
-      const userId = ctx.from.id;
-      const userName = ctx.from.username 
-        ? `@${ctx.from.username}` 
-        : `${ctx.from.first_name} ${ctx.from.last_name || ''}`;
-      
-      // Формируем сообщение для админов
-      let orderMessage = `📦 <b>НОВЫЙ ЗАКАЗ</b>\n`;
-      orderMessage += `👤 <b>Покупатель:</b> ${userName} (ID: ${userId})\n\n`;
-      
-      // Добавляем товары из корзины
-      orderMessage += `<b>Состав заказа:</b>\n`;
-      orderData.items.forEach((item, index) => {
-        orderMessage += `${index + 1}. ${item.name}`;
-        if (item.variant) orderMessage += ` - ${item.variant}`;
-        orderMessage += ` — ${item.price} ₽\n`;
-      });
-      
-      // Добавляем общую сумму
-      orderMessage += `\n<b>Итого:</b> ${orderData.total} ₽\n`;
-      
-      // Добавляем контактные данные
-      if (orderData.contact) orderMessage += `\n📞 <b>Телефон:</b> ${orderData.contact}`;
-      if (orderData.address) orderMessage += `\n🏠 <b>Адрес:</b> ${orderData.address}`;
-      
-      // Кнопки для админов
-      const adminButtons = Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Подтвердить заказ', `confirm_${userId}_${Date.now()}`)],
-        [Markup.button.callback('❌ Отклонить заказ', `reject_${userId}_${Date.now()}`)]
-      ]);
-
-      // Отправляем заказ всем админам
-      let successCount = 0;
-      for (const adminId of adminCache) {
-        try {
-          await bot.telegram.sendMessage(adminId, orderMessage, {
-            parse_mode: 'HTML',
-            reply_markup: adminButtons
-          });
-          successCount++;
-        } catch (error) {
-          console.error(`❌ Не удалось отправить заказ админу ${adminId}:`, error);
-        }
-      }
-
-      if (successCount === 0) {
-        throw new Error('Не удалось отправить заказ ни одному админу');
-      }
-
-      // Подтверждение для пользователя
-      await ctx.replyWithHTML(
-        '✅ <b>Ваш заказ успешно передан администраторам!</b>\n\n' +
-        'Администратор скоро свяжется с вами для подтверждения заказа и уточнения деталей доставки.'
-      );
-      
-      console.log(`✅ Заказ от пользователя ${userId} успешно обработан через deep link`);
-      
-    } catch (error) {
-      console.error('❌ Ошибка обработки заказа через deep link:', error);
-      await ctx.replyWithHTML(
-        '❌ <b>Произошла ошибка при обработке заказа.</b>\n' +
-        'Пожалуйста, попробуйте оформить заказ снова или свяжитесь с администратором.'
-      );
-    }
-    return;
-  }
-  
-  // Обычное приветствие
   // ✅ ИСПРАВЛЕНО: убраны лишние пробелы в URL
   const webAppUrl = 'https://cracker228.github.io/';
   ctx.reply(
@@ -497,191 +509,11 @@ bot.on('photo', async (ctx) => {
   }
 });
 
-/* ================== ЭНДПОИНТЫ ================== */
-
-app.get('/tg-image/:id', async (req, res) => {
-  try {
-    const link = await bot.telegram.getFileLink(req.params.id);
-    res.redirect(link.href);
-  } catch (error) {
-    console.error('❌ Ошибка получения изображения:', error);
-    res.sendStatus(404);
-  }
-});
-
-app.get('/', (_, res) => res.send('OK'));
-
-/* ================== ОБРАБОТКА ЗАКАЗОВ ИЗ WEBAPP ================== */
-
-bot.on('web_app_data', async (ctx) => {
-  try {
-    // Получаем необработанные данные
-    const rawData = ctx.payload;
-    
-    // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: если пришли некорректные данные
-    if (!rawData || rawData === "undefined" || rawData.trim() === "undefined") {
-      throw new Error('Получены некорректные данные заказа');
-    }
-    
-    // Пытаемся распарсить JSON
-    let order;
-    try {
-      order = JSON.parse(rawData);
-    } catch (parseError) {
-      console.error('❌ Ошибка парсинга JSON:', rawData);
-      throw new Error('Неверный формат данных заказа');
-    }
-    
-    // Проверяем минимальную структуру заказа
-    if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
-      throw new Error('Пустой заказ или отсутствуют товары');
-    }
-    
-    // Информация о пользователе
-    const userId = ctx.from.id;
-    const userName = ctx.from.username 
-      ? `@${ctx.from.username}` 
-      : `${ctx.from.first_name} ${ctx.from.last_name || ''}`;
-    
-    // Формируем сообщение для админов
-    let orderMessage = `📦 <b>НОВЫЙ ЗАКАЗ</b>\n`;
-    orderMessage += `👤 <b>Покупатель:</b> ${userName} (ID: ${userId})\n\n`;
-    
-    // Добавляем товары из корзины
-    orderMessage += `<b>Состав заказа:</b>\n`;
-    order.items.forEach((item, index) => {
-      orderMessage += `${index + 1}. ${item.name || 'Без названия'}`;
-      if (item.variant) orderMessage += ` - ${item.variant}`;
-      orderMessage += ` — ${item.price || 0} ₽\n`;
-    });
-    
-    // Добавляем общую сумму
-    const total = order.total || order.items.reduce((sum, item) => sum + (item.price || 0), 0);
-    orderMessage += `\n<b>Итого:</b> ${total} ₽\n`;
-    
-    // Добавляем контактные данные
-    if (order.contact) orderMessage += `\n📞 <b>Телефон:</b> ${order.contact}`;
-    if (order.address) orderMessage += `\n🏠 <b>Адрес:</b> ${order.address || 'не указан'}`;
-    
-    // Кнопки для админов
-    const adminButtons = Markup.inlineKeyboard([
-      [Markup.button.callback('✅ Подтвердить заказ', `confirm_${userId}_${Date.now()}`)],
-      [Markup.button.callback('❌ Отклонить заказ', `reject_${userId}_${Date.now()}`)]
-    ]);
-
-    // Отправляем заказ всем админам
-    const failedAdmins = [];
-    let successCount = 0;
-    for (const adminId of adminCache) {
-      try {
-        await bot.telegram.sendMessage(adminId, orderMessage, {
-          parse_mode: 'HTML',
-          reply_markup: adminButtons
-        });
-        successCount++;
-      } catch (error) {
-        console.error(`Не удалось отправить заказ админу ${adminId}:`, error);
-        failedAdmins.push(adminId);
-      }
-    }
-
-    // Если ни одному админу не удалось отправить - ошибка
-    if (successCount === 0) {
-      throw new Error(`Не удалось отправить заказ ни одному админу (${failedAdmins.join(', ')})`);
-    }
-
-    // Подтверждение для пользователя
-    let userMessage = '✅ <b>Ваш заказ успешно оформлен!</b>\n\n';
-    userMessage += `Сумма заказа: ${total} ₽\n`;
-    userMessage += 'Администратор скоро свяжется с вами для подтверждения заказа.';
-    
-    await ctx.replyWithHTML(userMessage);
-    
-    // Логируем успешный заказ
-    console.log(`✅ Заказ от пользователя ${userId} успешно обработан`);
-    
-  } catch (error) {
-    console.error('❌ Ошибка обработки заказа:', error);
-    
-    // Логируем полученные данные для отладки
-    console.log('Полученные данные:', ctx.payload);
-    
-    // Отправляем пользователю сообщение об ошибке
-    await ctx.replyWithHTML(
-      '❌ <b>Произошла ошибка при оформлении заказа.</b>\n' +
-      'Пожалуйста, попробуйте еще раз или свяжитесь с администратором.'
-    );
-    
-    // Отправляем админам уведомление об ошибке
-    try {
-      const adminError = `🚨 <b>Ошибка оформления заказа</b>\n\n` +
-                         `Пользователь: ${ctx.from.id}\n` +
-                         `Ошибка: ${error.message || 'Неизвестная ошибка'}\n` +
-                         `Данные: ${ctx.payload?.substring(0, 200) || 'нет данных'}`;
-      
-      for (const adminId of adminCache) {
-        await bot.telegram.sendMessage(adminId, adminError, { parse_mode: 'HTML' });
-      }
-    } catch (e) {
-      console.error('Не удалось отправить уведомление об ошибке админам:', e);
-    }
-  }
-});
-
-/* ================== ОБРАБОТКА КНОПОК АДМИНОВ ================== */
-
-// Обработка подтверждения заказа
-bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
-  const [, userId, orderId] = ctx.match;
-  
-  try {
-    // Отправляем уведомление пользователю
-    await bot.telegram.sendMessage(userId, 
-      '✅ Ваш заказ подтвержден!\n\n' +
-      'Администратор скоро свяжется с вами для уточнения деталей доставки.'
-    );
-    
-    // Редактируем сообщение для админа
-    await ctx.editMessageText(
-      ctx.message.text + '\n\n✅ <b>Заказ подтвержден</b>',
-      { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }
-    );
-    
-    await ctx.answerCbQuery('Заказ успешно подтвержден!');
-    
-    console.log(`✅ Заказ ${orderId} для пользователя ${userId} подтвержден`);
-  } catch (error) {
-    console.error('Ошибка подтверждения заказа:', error);
-    await ctx.answerCbQuery('Ошибка подтверждения заказа', true);
-  }
-});
-
-// Обработка отклонения заказа
-bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
-  const [, userId, orderId] = ctx.match;
-  
-  try {
-    await ctx.answerCbQuery('Причина отклонения:', { 
-      prompt: 'Введите причину отклонения заказа:' 
-    });
-    
-    // Сохраняем состояние для обработки причины
-    state[ctx.from.id] = {
-      step: 'REJECT_REASON',
-      userId: userId,
-      orderId: orderId,
-      originalMessage: ctx.message
-    };
-  } catch (error) {
-    console.error('Ошибка запроса причины отклонения:', error);
-    await ctx.answerCbQuery('Ошибка обработки', true);
-  }
-});
-
 /* ================== ЗАПУСК ================== */
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 HTTP сервер запущен на порту ${PORT}`);
+  console.log(`📦 Эндпоинт заказов: POST ${BACKEND_URL}/order`);
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
