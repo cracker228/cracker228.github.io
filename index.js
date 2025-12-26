@@ -350,6 +350,63 @@ app.get('/tg-image/:id', async (req, res) => {
 
 app.get('/', (_, res) => res.send('OK'));
 
+/* ================== ОБРАБОТКА ЗАКАЗОВ ИЗ WEBAPP ================== */
+
+bot.on('web_app_data', async (ctx) => {
+  try {
+    const payload = ctx.payload;
+    const order = JSON.parse(payload);
+
+    const userId = ctx.from.id;
+    const userName = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+
+    // Форматируем заказ для админа
+    let orderText = `📦 <b>Новый заказ</b>\n`;
+    orderText += `👤 Пользователь: ${userName} (ID: ${userId})\n\n`;
+    
+    for (const item of order.items) {
+      orderText += `• ${item.name}`;
+      if (item.variant) orderText += ` (${item.variant.type})`;
+      orderText += ` — ${item.price}₽\n`;
+    }
+
+    orderText += `\n📞 Контакт: ${order.contact || 'не указан'}`;
+    if (order.comment) orderText += `\n💬 Комментарий: ${order.comment}`;
+
+    // Отправляем всем админам
+    for (const adminId of adminCache) {
+      try {
+        await bot.telegram.sendMessage(adminId, orderText, {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ Обработан', callback_data: 'order_done' }
+            ]]
+          }
+        });
+      } catch (e) {
+        console.warn(`Не удалось отправить заказ админу ${adminId}`);
+      }
+    }
+
+    // Подтверждение пользователю
+    await ctx.reply('✅ Ваш заказ принят! Админ скоро свяжется с вами.');
+
+  } catch (e) {
+    console.error('Ошибка обработки заказа:', e);
+    await ctx.reply('❌ Произошла ошибка при отправке заказа. Попробуйте позже.');
+  }
+});
+
+// Обработка кнопки "✅ Обработан"
+bot.action('order_done', (ctx) => {
+  ctx.answerCbQuery('Заказ отмечен как обработанный');
+  ctx.editMessageText(ctx.message.text + '\n\n✅ <i>Обработан</i>', {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [] }
+  });
+});
+
 /* ================== ЗАПУСК ================== */
 
 app.listen(PORT, () => {
