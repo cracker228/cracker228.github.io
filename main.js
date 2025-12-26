@@ -15,7 +15,7 @@ let phoneNumber = localStorage.getItem('phoneNumber') || '';
 
 // === URL (исправлено: убраны пробелы в конце) ===
 const BACKEND_URL = 'https://cracker228-github-io.onrender.com';
-const API = 'https://cracker228-github-io.onrender.com/api';
+const API = 'https://cracker228-github-io.onrender.com/catalogs';
 
 // DOM
 const content = document.getElementById('content');
