@@ -354,9 +354,27 @@ app.get('/', (_, res) => res.send('OK'));
 
 bot.on('web_app_data', async (ctx) => {
   try {
-    // Получаем данные из WebApp
+    // Получаем необработанные данные
     const rawData = ctx.payload;
-    const order = JSON.parse(rawData);
+    
+    // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: если пришли некорректные данные
+    if (!rawData || rawData === "undefined" || rawData.trim() === "undefined") {
+      throw new Error('Получены некорректные данные заказа');
+    }
+    
+    // Пытаемся распарсить JSON
+    let order;
+    try {
+      order = JSON.parse(rawData);
+    } catch (parseError) {
+      console.error('❌ Ошибка парсинга JSON:', rawData);
+      throw new Error('Неверный формат данных заказа');
+    }
+    
+    // Проверяем минимальную структуру заказа
+    if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
+      throw new Error('Пустой заказ или отсутствуют товары');
+    }
     
     // Информация о пользователе
     const userId = ctx.from.id;
@@ -371,17 +389,18 @@ bot.on('web_app_data', async (ctx) => {
     // Добавляем товары из корзины
     orderMessage += `<b>Состав заказа:</b>\n`;
     order.items.forEach((item, index) => {
-      orderMessage += `${index + 1}. ${item.name}`;
+      orderMessage += `${index + 1}. ${item.name || 'Без названия'}`;
       if (item.variant) orderMessage += ` - ${item.variant}`;
-      orderMessage += ` — ${item.price} ₽\n`;
+      orderMessage += ` — ${item.price || 0} ₽\n`;
     });
     
     // Добавляем общую сумму
-    orderMessage += `\n<b>Итого:</b> ${order.total} ₽\n`;
+    const total = order.total || order.items.reduce((sum, item) => sum + (item.price || 0), 0);
+    orderMessage += `\n<b>Итого:</b> ${total} ₽\n`;
     
     // Добавляем контактные данные
     if (order.contact) orderMessage += `\n📞 <b>Телефон:</b> ${order.contact}`;
-    if (order.address) orderMessage += `\n🏠 <b>Адрес:</b> ${order.address}`;
+    if (order.address) orderMessage += `\n🏠 <b>Адрес:</b> ${order.address || 'не указан'}`;
     
     // Кнопки для админов
     const adminButtons = Markup.inlineKeyboard([
@@ -391,21 +410,28 @@ bot.on('web_app_data', async (ctx) => {
 
     // Отправляем заказ всем админам
     const failedAdmins = [];
+    let successCount = 0;
     for (const adminId of adminCache) {
       try {
         await bot.telegram.sendMessage(adminId, orderMessage, {
           parse_mode: 'HTML',
           reply_markup: adminButtons
         });
+        successCount++;
       } catch (error) {
         console.error(`Не удалось отправить заказ админу ${adminId}:`, error);
         failedAdmins.push(adminId);
       }
     }
 
+    // Если ни одному админу не удалось отправить - ошибка
+    if (successCount === 0) {
+      throw new Error(`Не удалось отправить заказ ни одному админу (${failedAdmins.join(', ')})`);
+    }
+
     // Подтверждение для пользователя
     let userMessage = '✅ <b>Ваш заказ успешно оформлен!</b>\n\n';
-    userMessage += `Сумма заказа: ${order.total} ₽\n`;
+    userMessage += `Сумма заказа: ${total} ₽\n`;
     userMessage += 'Администратор скоро свяжется с вами для подтверждения заказа.';
     
     await ctx.replyWithHTML(userMessage);
@@ -413,14 +439,11 @@ bot.on('web_app_data', async (ctx) => {
     // Логируем успешный заказ
     console.log(`✅ Заказ от пользователя ${userId} успешно обработан`);
     
-    // Очищаем корзину пользователя (опционально)
-    // Это можно сделать через localStorage в WebApp, но для надежности можно и здесь
-    if (failedAdmins.length > 0) {
-      console.warn(`⚠️ Не удалось отправить заказ следующим админам: ${failedAdmins.join(', ')}`);
-    }
-
   } catch (error) {
     console.error('❌ Ошибка обработки заказа:', error);
+    
+    // Логируем полученные данные для отладки
+    console.log('Полученные данные:', ctx.payload);
     
     // Отправляем пользователю сообщение об ошибке
     await ctx.replyWithHTML(
@@ -432,7 +455,8 @@ bot.on('web_app_data', async (ctx) => {
     try {
       const adminError = `🚨 <b>Ошибка оформления заказа</b>\n\n` +
                          `Пользователь: ${ctx.from.id}\n` +
-                         `Ошибка: ${error.message || 'Неизвестная ошибка'}`;
+                         `Ошибка: ${error.message || 'Неизвестная ошибка'}\n` +
+                         `Данные: ${ctx.payload?.substring(0, 200) || 'нет данных'}`;
       
       for (const adminId of adminCache) {
         await bot.telegram.sendMessage(adminId, adminError, { parse_mode: 'HTML' });
