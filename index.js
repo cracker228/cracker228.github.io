@@ -2,6 +2,11 @@ const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
 
+if (!process.env.BOT_TOKEN) {
+  console.error('❌ BOT_TOKEN is not defined');
+  process.exit(1);
+}
+
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 /* ================== ДАННЫЕ ================== */
@@ -9,14 +14,19 @@ const ADMINS_FILE = './admins.json';
 const CATALOG_DIR = './catalogs';
 const state = {};
 
-/* ================== HELPERS ================== */
-function loadAdmins() {
-  if (!fs.existsSync(ADMINS_FILE)) fs.writeFileSync(ADMINS_FILE, '[]');
-  return JSON.parse(fs.readFileSync(ADMINS_FILE));
+if (!fs.existsSync(CATALOG_DIR)) {
+  fs.mkdirSync(CATALOG_DIR, { recursive: true });
 }
 
-function saveAdmins(a) {
-  fs.writeFileSync(ADMINS_FILE, JSON.stringify(a, null, 2));
+/* ================== HELPERS ================== */
+function loadAdmins() {
+  if (!fs.existsSync(ADMINS_FILE)) {
+    const root = process.env.ADMIN_CHAT_ID
+      ? [Number(process.env.ADMIN_CHAT_ID)]
+      : [];
+    fs.writeFileSync(ADMINS_FILE, JSON.stringify(root, null, 2));
+  }
+  return JSON.parse(fs.readFileSync(ADMINS_FILE));
 }
 
 function isAdmin(id) {
@@ -52,29 +62,28 @@ bot.start(ctx => {
   );
 });
 
-/* ================== КНОПКИ ================== */
+/* ================== BUTTONS ================== */
 bot.hears('➕ Добавить товар', ctx => {
   if (!isAdmin(ctx.from.id)) return;
   state[ctx.from.id] = { step: 'ADD_CAT', vars: [] };
-  ctx.reply('Номер каталога (1-4):');
+  ctx.reply('Номер каталога (1–4):');
 });
 
 bot.hears('🗑 Удалить товар', ctx => {
   if (!isAdmin(ctx.from.id)) return;
   state[ctx.from.id] = { step: 'DEL_CAT' };
-  ctx.reply('Номер каталога (1-4):');
+  ctx.reply('Номер каталога (1–4):');
 });
 
 bot.hears('✏️ Переименовать каталог', ctx => {
   if (!isAdmin(ctx.from.id)) return;
   state[ctx.from.id] = { step: 'REN_CAT' };
-  ctx.reply('Номер каталога (1-4):');
+  ctx.reply('Номер каталога (1–4):');
 });
 
-/* ================== TEXT LOGIC ================== */
+/* ================== TEXT ================== */
 bot.on('text', ctx => {
   if (!isAdmin(ctx.from.id)) return;
-
   const s = state[ctx.from.id];
   if (!s) return;
 
@@ -82,26 +91,28 @@ bot.on('text', ctx => {
 
   switch (s.step) {
 
-    /* ===== ADD PRODUCT ===== */
-    case 'ADD_CAT':
-      s.catalog = Number(t);
+    case 'ADD_CAT': {
+      const n = Number(t);
+      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
+      s.catalog = n;
       s.step = 'ADD_NAME';
       return ctx.reply('Название товара:');
+    }
 
     case 'ADD_NAME':
       s.name = t;
       s.step = 'ADD_DESC';
-      return ctx.reply('Описание товара:');
+      return ctx.reply('Описание:');
 
     case 'ADD_DESC':
       s.desc = t;
       s.step = 'ADD_IMAGE';
-      return ctx.reply('📸 Фото товара (отправь изображение):');
+      return ctx.reply('📸 Фото товара:');
 
     case 'ADD_VAR_TYPE':
       s.varType = t;
       s.step = 'ADD_VAR_PRICE';
-      return ctx.reply('Цена вариации:');
+      return ctx.reply('Цена:');
 
     case 'ADD_VAR_PRICE':
       s.varPrice = Number(t);
@@ -114,59 +125,64 @@ bot.on('text', ctx => {
         return ctx.reply('Тип вариации:');
       }
 
-      const cat = loadCatalog(s.catalog);
-      cat.items.push({
-        id: Date.now().toString(),
-        name: s.name,
-        description: s.desc,
-        image: s.image,
-        subcategories: s.vars
-      });
-      saveCatalog(s.catalog, cat);
-      delete state[ctx.from.id];
-      return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
-
-    /* ===== DELETE ===== */
-    case 'DEL_CAT':
-      s.catalog = Number(t);
-      const dc = loadCatalog(s.catalog);
-      if (!dc.items.length) {
+      if (t === '✅ Завершить') {
+        const cat = loadCatalog(s.catalog);
+        cat.items.push({
+          id: Date.now().toString(),
+          name: s.name,
+          description: s.desc,
+          image: s.image,
+          subcategories: s.vars
+        });
+        saveCatalog(s.catalog, cat);
         delete state[ctx.from.id];
-        return ctx.reply('❌ Каталог пуст');
+        return ctx.reply('✅ Товар добавлен', Markup.removeKeyboard());
+      }
+      return;
+
+    case 'DEL_CAT': {
+      const n = Number(t);
+      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
+      s.catalog = n;
+      const c = loadCatalog(n);
+      if (!c.items.length) {
+        delete state[ctx.from.id];
+        return ctx.reply('Каталог пуст');
       }
       s.step = 'DEL_ITEM';
       return ctx.reply(
         'Выберите товар:',
-        Markup.keyboard(dc.items.map(i => [i.name])).resize()
+        Markup.keyboard(c.items.map(i => [i.name])).resize()
       );
+    }
 
-    case 'DEL_ITEM':
-      const dcat = loadCatalog(s.catalog);
-      dcat.items = dcat.items.filter(i => i.name !== t);
-      saveCatalog(s.catalog, dcat);
+    case 'DEL_ITEM': {
+      const c = loadCatalog(s.catalog);
+      c.items = c.items.filter(i => i.name !== t);
+      saveCatalog(s.catalog, c);
       delete state[ctx.from.id];
       return ctx.reply('🗑 Удалено', Markup.removeKeyboard());
+    }
 
-    /* ===== RENAME ===== */
-    case 'REN_CAT':
-      s.catalog = Number(t);
+    case 'REN_CAT': {
+      const n = Number(t);
+      if (![1,2,3,4].includes(n)) return ctx.reply('❌ 1–4');
+      s.catalog = n;
       s.step = 'REN_NAME';
       return ctx.reply('Новое название:');
+    }
 
-    case 'REN_NAME':
-      const rc = loadCatalog(s.catalog);
-      rc.name = t;
-      saveCatalog(s.catalog, rc);
+    case 'REN_NAME': {
+      const c = loadCatalog(s.catalog);
+      c.name = t;
+      saveCatalog(s.catalog, c);
       delete state[ctx.from.id];
-      return ctx.reply('✅ Каталог переименован');
-
-    default:
-      delete state[ctx.from.id];
-      return;
+      return ctx.reply('✅ Переименовано');
+    }
   }
 });
 
-/* ================== PHOTOS ================== */
+/* ================== PHOTO ================== */
 bot.on('photo', ctx => {
   const s = state[ctx.from.id];
   if (!s) return;
@@ -188,7 +204,7 @@ bot.on('photo', ctx => {
 
     s.step = 'ADD_MORE';
     return ctx.reply(
-      'Добавить ещё вариацию?',
+      'Добавить ещё?',
       Markup.keyboard([['➕ Добавить ещё'], ['✅ Завершить']]).resize()
     );
   }
@@ -196,5 +212,7 @@ bot.on('photo', ctx => {
 
 /* ================== LAUNCH ================== */
 bot.launch();
+console.log('✅ Bot launched');
+
 process.once('SIGINT', () => bot.stop());
 process.once('SIGTERM', () => bot.stop());
