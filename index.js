@@ -121,7 +121,7 @@ async function saveCatalog(catalogId, data, sha) {
 
 bot.start(async ctx => {
   delete state[ctx.from.id];
-  const domain = process.env.DOMAIN || 'your-username.github.io';
+  const domain = process.env.DOMAIN || 'cracker228.github.io';
   const repo = process.env.REPO || '';
   const webAppUrl = `https://${domain}/${repo}`.replace(/\/+$/, '');
   ctx.reply(
