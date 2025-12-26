@@ -46,7 +46,7 @@ bot.start(ctx => {
     Markup.inlineKeyboard([
       Markup.button.webApp(
         'Открыть магазин',
-        'https://cracker228-github-io.onrender.com'
+        'https://cracker228.github.io'
       )
     ])
   );
