@@ -1,4 +1,18 @@
 {
   "name": "Жидкости",
-  "items": []
+  "items": [
+    {
+      "id": "1767446510674",
+      "name": "Podonki / Isterika",
+      "description": "50 mg",
+      "image": "AgACAgIAAxkBAAIITGlZF1fzN2CaYvVQqq_CJYV4AAHtngACxg5rG-79yUoxfp3ldKcDwAEAAwIAA3cAAzgE",
+      "subcategories": [
+        {
+          "type": "Мармеладные мишки",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIUmlZF-vXxRCowFGBusuVqgjDWZ-RAALjDmsb7v3JSuf6FublsntkAQADAgADdwADOAQ"
+        }
+      ]
+    }
+  ]
 }
