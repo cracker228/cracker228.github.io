@@ -13,6 +13,49 @@
           "image": "AgACAgIAAxkBAAIIUmlZF-vXxRCowFGBusuVqgjDWZ-RAALjDmsb7v3JSuf6FublsntkAQADAgADdwADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767715145220",
+      "name": "MonsterVapor",
+      "description": "20 mg",
+      "image": "AgACAgIAAxkBAAIIo2ldL7JZ-5aqDZeOGKOELe5cgiBJAAIWD2sbO27pSoo0Lgqo69E5AQADAgADeAADOAQ",
+      "subcategories": [
+        {
+          "type": "Персик маракуйя",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIqWldL9ezyFoVS6rRVIb8oyYVCTWCAAIaD2sbO27pSqpOJ-A5khoNAQADAgADeAADOAQ"
+        },
+        {
+          "type": "Хвоя с лесными ягодами",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIsWldL-6-DjYNWTS88BYGApHP7yJmAAIbD2sbO27pSscsfscjbXtdAQADAgADeAADOAQ"
+        },
+        {
+          "type": "Кола с лимоном",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIuWldMAHsT7uWDcwt3xqKikv7HtBsAAIcD2sbO27pSndq0WdXDY_mAQADAgADeAADOAQ"
+        },
+        {
+          "type": "Малина с клюквой",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIwWldMCa8X9pmxhTR-EcHBqSh9NnAAAIdD2sbO27pSipPQp6fdkaUAQADAgADeAADOAQ"
+        },
+        {
+          "type": "Виноградная кола",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIIyWldMENBPxIoOI4YVYq3yltNmLKuAAIkD2sbO27pSpL5fyceXX8kAQADAgADeAADOAQ"
+        },
+        {
+          "type": "Ананас с манго и клубникой",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAII0WldMQ-fITrUVGx7FNggUKZcBdHuAAIoD2sbO27pSjicFFCOQNaLAQADAgADbQADOAQ"
+        },
+        {
+          "type": "Клубника с бананом",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAII2WldMUbbEjs-IYdMPoCoKxE7JdMhAAI3D2sbO27pSveH5oGk8N-kAQADAgADeAADOAQ"
+        }
+      ]
     }
   ]
 }
