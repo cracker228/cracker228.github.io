@@ -67,6 +67,19 @@
           "image": "AgACAgIAAxkBAAIJqWlfpJb62M-qI6TdHKqseVb2iacVAAJ0D2sbcCH4Sv58AAGy7e--7AEAAwIAA3gAAzgE"
         }
       ]
+    },
+    {
+      "id": "1767875852664",
+      "name": "S-1 Coil",
+      "description": "Smoant Santi, Charon Baby Plus и Knight 40",
+      "image": "AgACAgIAAxkBAAIJvWlfpP6VusN5c3l-6Vy6-coX7F8PAAJ7D2sbcCH4Sg_r-7Cvu-VeAQADAgADeAADOAQ",
+      "subcategories": [
+        {
+          "type": "S-1 Coil",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJvWlfpP6VusN5c3l-6Vy6-coX7F8PAAJ7D2sbcCH4Sg_r-7Cvu-VeAQADAgADeAADOAQ"
+        }
+      ]
     }
   ]
 }
