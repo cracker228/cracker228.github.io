@@ -54,6 +54,19 @@
           "image": "AgACAgIAAxkBAAIJhmlfo5GydCbviet-DNgffEVnc2N6AAJuD2sbcCH4SvpbRBqlNaavAQADAgADbQADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767875752759",
+      "name": "P-1 Coil",
+      "description": "Smoant Pasito Mini",
+      "image": "AgACAgIAAxkBAAIJqWlfpJb62M-qI6TdHKqseVb2iacVAAJ0D2sbcCH4Sv58AAGy7e--7AEAAwIAA3gAAzgE",
+      "subcategories": [
+        {
+          "type": "P-1 Coil",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJqWlfpJb62M-qI6TdHKqseVb2iacVAAJ0D2sbcCH4Sv58AAGy7e--7AEAAwIAA3gAAzgE"
+        }
+      ]
     }
   ]
 }
