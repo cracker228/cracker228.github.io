@@ -1,4 +1,28 @@
 {
   "name": "Расходники",
-  "items": []
+  "items": [
+    {
+      "id": "1767874975739",
+      "name": "Картридж Xros",
+      "description": "Подходят на устройства Xros",
+      "image": "AgACAgIAAxkBAAIJLGlfoW1oATA0JiMGXHR0yDlkHQwxAAJmD2sbcCH4SttzQn1eiy_dAQADAgADeAADOAQ",
+      "subcategories": [
+        {
+          "type": "0.4 Ома",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJLGlfoW1oATA0JiMGXHR0yDlkHQwxAAJmD2sbcCH4SttzQn1eiy_dAQADAgADeAADOAQ"
+        },
+        {
+          "type": "0.6 Ома",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJLGlfoW1oATA0JiMGXHR0yDlkHQwxAAJmD2sbcCH4SttzQn1eiy_dAQADAgADeAADOAQ"
+        },
+        {
+          "type": "0.8 Ома",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJLGlfoW1oATA0JiMGXHR0yDlkHQwxAAJmD2sbcCH4SttzQn1eiy_dAQADAgADeAADOAQ"
+        }
+      ]
+    }
+  ]
 }
