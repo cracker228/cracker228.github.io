@@ -58,39 +58,6 @@
       ]
     },
     {
-      "id": "1767715797882",
-      "name": "Злая монашка кислые",
-      "description": "70 mg",
-      "image": "AgACAgIAAxkBAAII6WldMtbazeOJQHQu5JzttU6SE0m1AAJRD2sbO27pStZ2IEQe1gKOAQADAgADeQADOAQ",
-      "subcategories": [
-        {
-          "type": "Лимонная кислота с клюквой",
-          "price": 400,
-          "image": "AgACAgIAAxkBAAII6WldMtbazeOJQHQu5JzttU6SE0m1AAJRD2sbO27pStZ2IEQe1gKOAQADAgADeQADOAQ"
-        },
-        {
-          "type": "Кислый апельсин",
-          "price": 400,
-          "image": "AgACAgIAAxkBAAII92ldM4lIZUYff9RZheOkX7NVmQABLwACdQ9rGztu6UowLA7mcqed_gEAAwIAA3kAAzgE"
-        },
-        {
-          "type": "Кислый грейпфрут",
-          "price": 400,
-          "image": "AgACAgIAAxkBAAII92ldM4lIZUYff9RZheOkX7NVmQABLwACdQ9rGztu6UowLA7mcqed_gEAAwIAA3kAAzgE"
-        },
-        {
-          "type": "Алыча с брусникой",
-          "price": 400,
-          "image": "AgACAgIAAxkBAAII92ldM4lIZUYff9RZheOkX7NVmQABLwACdQ9rGztu6UowLA7mcqed_gEAAwIAA3kAAzgE"
-        },
-        {
-          "type": "Смородина и лимон",
-          "price": 400,
-          "image": "AgACAgIAAxkBAAII92ldM4lIZUYff9RZheOkX7NVmQABLwACdQ9rGztu6UowLA7mcqed_gEAAwIAA3kAAzgE"
-        }
-      ]
-    },
-    {
       "id": "1767876828019",
       "name": "Angry Vape",
       "description": "50 mg",
