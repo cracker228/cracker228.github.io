@@ -93,6 +93,24 @@
           "image": "AgACAgIAAxkBAAIJ4mlfpbn3gw4rXlkMAzwiLRamFPHUAAKBD2sbcCH4Sgk4jCa9vOGnAQADAgADeAADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767877475112",
+      "name": "Manto AIO Coil",
+      "description": "Любое АИО-Устройство Манту",
+      "image": "AgACAgIAAxkBAAIKX2lfqzpYw4FBiIcc_HD5c5Pyq0EAA8EPaxtwIfhKIhEoP9NHETgBAAMCAAN4AAM4BA",
+      "subcategories": [
+        {
+          "type": "0.15 Ом",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIKX2lfqzpYw4FBiIcc_HD5c5Pyq0EAA8EPaxtwIfhKIhEoP9NHETgBAAMCAAN4AAM4BA"
+        },
+        {
+          "type": "0.3 Ом",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIKX2lfqzpYw4FBiIcc_HD5c5Pyq0EAA8EPaxtwIfhKIhEoP9NHETgBAAMCAAN4AAM4BA"
+        }
+      ]
     }
   ]
 }
