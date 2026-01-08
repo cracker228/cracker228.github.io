@@ -36,6 +36,24 @@
           "image": "AgACAgIAAxkBAAIJW2lfojvL4b-gkt08lrUztbtX87peAAJoD2sbcCH4SvB3r1UJTpMUAQADAgADeAADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767875522050",
+      "name": "Испаритель В-серии",
+      "description": "Aegis, Boost 2-3",
+      "image": "AgACAgIAAxkBAAIJhmlfo5GydCbviet-DNgffEVnc2N6AAJuD2sbcCH4SvpbRBqlNaavAQADAgADbQADOAQ",
+      "subcategories": [
+        {
+          "type": "0.3 Ома",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJhmlfo5GydCbviet-DNgffEVnc2N6AAJuD2sbcCH4SvpbRBqlNaavAQADAgADbQADOAQ"
+        },
+        {
+          "type": "0.2 Ома",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJhmlfo5GydCbviet-DNgffEVnc2N6AAJuD2sbcCH4SvpbRBqlNaavAQADAgADbQADOAQ"
+        }
+      ]
     }
   ]
 }
