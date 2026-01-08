@@ -132,6 +132,39 @@
           "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767879384271",
+      "name": "Angry Vape",
+      "description": "50 mg",
+      "image": "AgACAgIAAxkBAAIKvWlfskwXepfi_hyC8k2uk3O0z-IzAAIlD2sb4QUBS61mPUpCjLhLAQADAgADeQADOAQ",
+      "subcategories": [
+        {
+          "type": "Виноградная газировка",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKy2lfsoHBWG4BfOqEAAFH7p0F8HG5RwACJg9rG-EFAUsAAQrTJ0s-3y8BAAMCAAN4AAM4BA"
+        },
+        {
+          "type": "Ананасовая газировка",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKy2lfsoHBWG4BfOqEAAFH7p0F8HG5RwACJg9rG-EFAUsAAQrTJ0s-3y8BAAMCAAN4AAM4BA"
+        },
+        {
+          "type": "Малиновый лимонад",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKy2lfsoHBWG4BfOqEAAFH7p0F8HG5RwACJg9rG-EFAUsAAQrTJ0s-3y8BAAMCAAN4AAM4BA"
+        },
+        {
+          "type": "Малиновый джем",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKy2lfsoHBWG4BfOqEAAFH7p0F8HG5RwACJg9rG-EFAUsAAQrTJ0s-3y8BAAMCAAN4AAM4BA"
+        },
+        {
+          "type": "Ягодные леденцы",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKy2lfsoHBWG4BfOqEAAFH7p0F8HG5RwACJg9rG-EFAUsAAQrTJ0s-3y8BAAMCAAN4AAM4BA"
+        }
+      ]
     }
   ]
 }
