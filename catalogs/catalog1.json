@@ -89,6 +89,49 @@
           "image": "AgACAgIAAxkBAAII92ldM4lIZUYff9RZheOkX7NVmQABLwACdQ9rGztu6UowLA7mcqed_gEAAwIAA3kAAzgE"
         }
       ]
+    },
+    {
+      "id": "1767876828019",
+      "name": "Angry Vape",
+      "description": "50 mg",
+      "image": "AgACAgIAAxkBAAIKDWlfqD6QmIHz-owAATtpp5d1C6QbmQACbw5rG-EFAUs_dB3NrdnKvgEAAwIAA3gAAzgE",
+      "subcategories": [
+        {
+          "type": "Манго",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Зеленое яблоко с вишней",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Черный виноград",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Йогурт с киви",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Груша с ананасом",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Грейпфрут с малиной",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        },
+        {
+          "type": "Яблоко с киви",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKE2lfqGF0PL6zQhCf0MngGsfgeyd7AAJ0Dmsb4QUBSx1NBn5rIwh8AQADAgADeAADOAQ"
+        }
+      ]
     }
   ]
 }
