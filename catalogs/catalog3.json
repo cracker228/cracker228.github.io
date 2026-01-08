@@ -124,6 +124,19 @@
           "image": "AgACAgIAAxkBAAIKhmlfrArXYAbsn8g62uL6yGxscdRpAALHD2sbcCH4SkO4D4M9k-VDAQADAgADbQADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767877989726",
+      "name": "Картриджи Brusko Minican",
+      "description": "Brusko Minican",
+      "image": "AgACAgIAAxkBAAIKpWlfrTn_AAGzXoRKvmxfNfF5ivIEvQACzw9rG3Ah-ErWXzMUkZ02UwEAAwIAA3gAAzgE",
+      "subcategories": [
+        {
+          "type": "0.4 ом",
+          "price": 400,
+          "image": "AgACAgIAAxkBAAIKpWlfrTn_AAGzXoRKvmxfNfF5ivIEvQACzw9rG3Ah-ErWXzMUkZ02UwEAAwIAA3gAAzgE"
+        }
+      ]
     }
   ]
 }
