@@ -80,6 +80,19 @@
           "image": "AgACAgIAAxkBAAIJvWlfpP6VusN5c3l-6Vy6-coX7F8PAAJ7D2sbcCH4Sg_r-7Cvu-VeAQADAgADeAADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767876052263",
+      "name": "Картридж Vaporesso Vibe",
+      "description": "Vaporesso Vibe",
+      "image": "AgACAgIAAxkBAAIJ4mlfpbn3gw4rXlkMAzwiLRamFPHUAAKBD2sbcCH4Sgk4jCa9vOGnAQADAgADeAADOAQ",
+      "subcategories": [
+        {
+          "type": "0.8 Om",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJ4mlfpbn3gw4rXlkMAzwiLRamFPHUAAKBD2sbcCH4Sgk4jCa9vOGnAQADAgADeAADOAQ"
+        }
+      ]
     }
   ]
 }
