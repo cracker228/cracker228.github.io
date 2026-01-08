@@ -23,6 +23,19 @@
           "image": "AgACAgIAAxkBAAIJLGlfoW1oATA0JiMGXHR0yDlkHQwxAAJmD2sbcCH4SttzQn1eiy_dAQADAgADeAADOAQ"
         }
       ]
+    },
+    {
+      "id": "1767875153333",
+      "name": "Испаритель К-1",
+      "description": "Pasito 2-3, Knight 80, Knight AIO",
+      "image": "AgACAgIAAxkBAAIJW2lfojvL4b-gkt08lrUztbtX87peAAJoD2sbcCH4SvB3r1UJTpMUAQADAgADeAADOAQ",
+      "subcategories": [
+        {
+          "type": "К-1",
+          "price": 300,
+          "image": "AgACAgIAAxkBAAIJW2lfojvL4b-gkt08lrUztbtX87peAAJoD2sbcCH4SvB3r1UJTpMUAQADAgADeAADOAQ"
+        }
+      ]
     }
   ]
 }
